@@ -1,0 +1,20 @@
+name: release-upload
+
+on:
+  release:
+    types: [ created ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-java@v4
+      with: { java-version: '21', distribution: 'temurin' }
+    - uses: gradle/actions/setup-gradle@af1da67850ed9a4cedd57bfd976089dd991e2582 # v4.0.0
+    - name: Build with Gradle
+      run: ./gradlew build
+    - name: Publish to GitHub Releases
+      run: gh release upload ${{ github.event.release.tag_name }} build/libs/*
