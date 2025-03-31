@@ -3,6 +3,9 @@ name: release-upload
 on:
   release:
     types: [ created ]
+  workflow_run:
+    workflows: [ 'release-create' ]
+    types:  [ completed ]
 
 jobs:
   build:
