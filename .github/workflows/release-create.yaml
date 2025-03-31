@@ -17,7 +17,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@af1da67850ed9a4cedd57bfd976089dd991e2582 # v4.0.0
       - name: Build with Gradle
         id: build
-        run: ./gradlew shadowJar
+        run: ./gradlew assemble
       - name: Release
         uses: softprops/action-gh-release@c95fe1489396fe8a9eb87c0abf8aa5b2ef267fda # @v2
       - name: Publish to GitHub Releases
@@ -25,4 +25,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           ref=${{ github.event.ref }}
-          gh release upload ${ref##*/} build/libs/*
+          gh release upload ${ref##*/} build/public/*

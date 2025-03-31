@@ -1,6 +1,8 @@
 package deb.simple.cli;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
 import deb.simple.build_deb.BuildDeb;
 import deb.simple.build_deb.BuildDeb.DebPackageConfig;
 import jakarta.validation.ConstraintViolationException;
@@ -46,7 +48,13 @@ public class SimpleDebApplication {
         @Override
         public void run() {
             var mapper = JsonMapper.builder().findAndAddModules().build();
-            var config = mapper.readValue(configFile.toFile(), DebPackageConfig.class);
+            var yamlMapper = YAMLMapper.builder().findAndAddModules().build();
+            DebPackageConfig config;
+            try {
+                config = mapper.readValue(configFile.toFile(), DebPackageConfig.class);
+            } catch (JsonProcessingException jpe) {
+                config = yamlMapper.readValue(configFile.toFile(), DebPackageConfig.class);
+            }
             try (ValidatorFactory validatorFactory = Validation.buildDefaultValidatorFactory()) {
                 var errors = validatorFactory.getValidator().validate(config);
                 if (!errors.isEmpty())
