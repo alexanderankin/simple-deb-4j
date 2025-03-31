@@ -4,7 +4,7 @@ This project provides a library and command line tool for performing the debian 
 
 ## changes
 
-* version 0.0.2
+* version 0.0.2 - `Mon, 31 Mar 2025 14:15:32 -0400`
   * fix cli bug while deserializing config file
   * YAML support
   * change upload pattern
