@@ -5,6 +5,7 @@ This project provides a library and command line tool for performing the debian 
 ## changes
 
 * version 0.0.2
+  * fix cli bug while deserializing config file
   * YAML support
   * change upload pattern
   * include published json schema for IDE

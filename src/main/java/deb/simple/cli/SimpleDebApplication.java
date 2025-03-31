@@ -4,7 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
 import deb.simple.build_deb.BuildDeb;
-import deb.simple.build_deb.BuildDeb.DebPackageConfig;
+import deb.simple.build_deb.DebPackageConfig;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validation;
 import jakarta.validation.ValidatorFactory;

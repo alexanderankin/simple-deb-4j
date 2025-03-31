@@ -1,11 +1,6 @@
 package deb.simple.build_deb;
 
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import lombok.Data;
 import lombok.SneakyThrows;
-import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.compress.archivers.ar.ArArchiveEntry;
 import org.apache.commons.compress.archivers.ar.ArArchiveOutputStream;
@@ -104,99 +99,4 @@ public class BuildDeb {
         return out.toByteArray();
     }
 
-    @Data
-    @Accessors(chain = true)
-    public static class DebPackageConfig {
-        @Valid
-        PackageMeta meta;
-        @Valid
-        ControlExtras control;
-        @Valid
-        DebFileSpec files;
-
-        sealed interface TarFileSpec {
-            String getPath();
-
-            Integer getMode();
-
-            @Data
-            @Accessors(chain = true)
-            final class TextTarFileSpec implements TarFileSpec {
-                String path;
-                String content;
-                Integer mode;
-            }
-
-            @Data
-            @Accessors(chain = true)
-            final class BinaryTarFileSpec implements TarFileSpec {
-                String path;
-                byte[] content;
-                Integer mode;
-            }
-        }
-
-        @Data
-        @Accessors(chain = true)
-        public static class PackageMeta {
-            @NotBlank
-            String name;
-            @NotBlank
-            String version;
-            /**
-             * todo make me an enum as reported by `dpkg-architecture -L --match-bits 64 --match-endian little --match-wildcard linux-any`
-             */
-            @NotBlank
-            String arch;
-
-            public String getDebFilename() {
-                return name + "_" + version + "_" + arch + ".deb";
-            }
-        }
-
-        @Data
-        @Accessors(chain = true)
-        public static class ControlExtras {
-            @NotNull
-            String depends = "";
-            @NotNull
-            String recommends = "";
-            @NotNull
-            String section = "main";
-            @NotNull
-            String priority = "optional";
-            @NotNull
-            String homepage = "";
-            @NotBlank
-            String maintainer = "";
-            @NotBlank
-            String description = "";
-
-            public String render(PackageMeta meta) {
-                return String.format("""
-                                Package: %s
-                                Version: %s
-                                Depends: %s
-                                Recommends: %s
-                                Section: %s
-                                Priority: %s
-                                Homepage: %s
-                                Architecture: %s
-                                Installed-Size: 10
-                                Maintainer: %s
-                                Description: %s
-                                """,
-                        meta.getName(), meta.getVersion(), depends, recommends, section, priority,
-                        homepage, meta.getArch(), maintainer, description
-                ).strip() + "\n";
-            }
-        }
-
-        @Data
-        @Accessors(chain = true)
-        public static class DebFileSpec {
-            List<TarFileSpec> controlFiles;
-            List<TarFileSpec> dataFiles;
-        }
-    }
 }

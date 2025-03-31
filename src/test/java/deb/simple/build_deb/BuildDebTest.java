@@ -1,8 +1,8 @@
 package deb.simple.build_deb;
 
-import deb.simple.build_deb.BuildDeb.DebPackageConfig.ControlExtras;
-import deb.simple.build_deb.BuildDeb.DebPackageConfig.DebFileSpec;
-import deb.simple.build_deb.BuildDeb.DebPackageConfig.PackageMeta;
+import deb.simple.build_deb.DebPackageConfig.ControlExtras;
+import deb.simple.build_deb.DebPackageConfig.DebFileSpec;
+import deb.simple.build_deb.DebPackageConfig.PackageMeta;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
@@ -11,7 +11,6 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.images.builder.Transferable;
 
 import java.util.List;
@@ -40,13 +39,13 @@ class BuildDebTest {
                 .setArch("arm64")
                 .setVersion("0.0.1");
         var deb = buildDeb.buildDebToArchive(
-                validate(new BuildDeb.DebPackageConfig()
+                validate(new DebPackageConfig()
                         .setMeta(meta)
                         .setControl(new ControlExtras()
                                 .setMaintainer("test_simpleInstall")
                                 .setDescription("test_simpleInstall"))
                         .setFiles(new DebFileSpec()
-                                .setDataFiles(List.of(new BuildDeb.DebPackageConfig.TarFileSpec.TextTarFileSpec()
+                                .setDataFiles(List.of(new DebPackageConfig.TarFileSpec.TextTarFileSpec()
                                         .setMode(0x755)
                                         .setPath("/usr/bin/test_simpleInstall")
                                         .setContent("#!/usr/bin/env bash\necho test_simpleInstall")))))
