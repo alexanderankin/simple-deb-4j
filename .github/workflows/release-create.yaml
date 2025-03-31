@@ -25,7 +25,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           ref=${{ github.event.ref }}
-          gh release upload ${ref} build/libs/* || {
-            echo it "didn't" work
-            gh release upload ${ref##*/} build/libs/*
-          }
+          gh release upload ${ref##*/} build/libs/*
