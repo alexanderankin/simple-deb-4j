@@ -1,5 +1,6 @@
 package deb.simple.build_deb;
 
+import deb.simple.DebArch;
 import deb.simple.build_deb.DebPackageConfig.ControlExtras;
 import deb.simple.build_deb.DebPackageConfig.DebFileSpec;
 import deb.simple.build_deb.DebPackageConfig.PackageMeta;
@@ -15,7 +16,7 @@ import org.testcontainers.images.builder.Transferable;
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @Slf4j
 class BuildDebTest {
@@ -36,7 +37,7 @@ class BuildDebTest {
     void test_simpleInstall() {
         PackageMeta meta = new PackageMeta()
                 .setName("test_simpleInstall")
-                .setArch("arm64")
+                .setArch(DebArch.current())
                 .setVersion("0.0.1");
         var deb = buildDeb.buildDebToArchive(
                 validate(new DebPackageConfig()
@@ -53,9 +54,10 @@ class BuildDebTest {
 
         var fileName = meta.getDebFilename();
 
-        try (GenericContainer<?> genericContainer = new GenericContainer<>("debian:12-slim")
-                .withCreateContainerCmdModifier(c -> c.withEntrypoint("tail", "-f", "/dev/null"))
-                .withCopyToContainer(Transferable.of(deb), "/tmp/" + fileName)) {
+        try (GenericContainer<?> genericContainer = new GenericContainer<>("debian:12-slim")) {
+            genericContainer
+                    .withCreateContainerCmdModifier(c -> c.withEntrypoint("tail", "-f", "/dev/null"))
+                    .withCopyToContainer(Transferable.of(deb), "/tmp/" + fileName);
             genericContainer.start();
             var result = genericContainer.execInContainer("dpkg", "-i", "/tmp/" + fileName);
             System.out.println(result.getStderr());

@@ -3,6 +3,7 @@ package deb.simple.build_deb;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import deb.simple.DebArch;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -92,11 +93,8 @@ public class DebPackageConfig {
         String name;
         @NotBlank
         String version;
-        /**
-         * todo make me an enum as reported by `dpkg-architecture -L --match-bits 64 --match-endian little --match-wildcard linux-any`
-         */
-        @NotBlank
-        String arch;
+        @NotNull
+        DebArch arch;
 
         public String getDebFilename() {
             return name + "_" + version + "_" + arch + ".deb";
