@@ -4,6 +4,10 @@ This project provides a library and command line tool for performing the debian 
 
 ## changes
 
+* version 0.0.3 - `Mon, 31 Mar 2025 23:39:30 -0400`
+  * support `file` and `url` types of files
+  * arch is an enum with two members for `amd64` and `arm64`
+
 * version 0.0.2 - `Mon, 31 Mar 2025 14:15:32 -0400`
   * fix cli bug while deserializing config file
   * YAML support
