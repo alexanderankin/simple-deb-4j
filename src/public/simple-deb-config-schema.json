@@ -30,7 +30,7 @@
         },
         "arch": {
           "type": "string",
-          "minLength": 1,
+          "enum": ["amd64", "aarch64"],
           "description": "Should match architectures from `dpkg-architecture`"
         }
       }
@@ -85,7 +85,9 @@
     "TarFileSpec": {
       "oneOf": [
         { "$ref": "#/$defs/TextTarFileSpec" },
-        { "$ref": "#/$defs/BinaryTarFileSpec" }
+        { "$ref": "#/$defs/BinaryTarFileSpec" },
+        { "$ref": "#/$defs/FileTarFileSpec" },
+        { "$ref": "#/$defs/UrlTarFileSpec" }
       ]
     },
     "TextTarFileSpec": {
@@ -119,6 +121,58 @@
         "content": {
           "type": "string",
           "contentEncoding": "base64"
+        },
+        "mode": {
+          "type": "integer"
+        }
+      }
+    },
+    "FileTarFileSpec": {
+      "type": "object",
+      "required": ["path", "file"],
+      "properties": {
+        "type": {
+          "const": "file"
+        },
+        "path": {
+          "type": "string"
+        },
+        "sourcePath": {
+          "type": "string",
+          "description": "Path to the source file on disk"
+        },
+        "mode": {
+          "type": "integer"
+        }
+      }
+    },
+    "UrlTarFileSpec": {
+      "type": "object",
+      "required": ["path", "url"],
+      "properties": {
+        "type": {
+          "const": "url"
+        },
+        "path": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL to fetch content from"
+        },
+        "bearerToken": {
+          "type": "string"
+        },
+        "headers": {
+          "type": "string",
+          "description": "Optional custom HTTP headers",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
         },
         "mode": {
           "type": "integer"
