@@ -5,11 +5,17 @@ import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 import lombok.experimental.Accessors;
 
+import java.net.URI;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Data
 @Accessors(chain = true)
@@ -26,28 +32,55 @@ public class DebPackageConfig {
     @JsonSubTypes({
             @JsonSubTypes.Type(value = TarFileSpec.TextTarFileSpec.class, name = "text"),
             @JsonSubTypes.Type(value = TarFileSpec.BinaryTarFileSpec.class, name = "binary"),
+            @JsonSubTypes.Type(value = TarFileSpec.FileTarFileSpec.class, name = "file"),
+            @JsonSubTypes.Type(value = TarFileSpec.UrlTarFileSpec.class, name = "url"),
     })
-    sealed interface TarFileSpec {
-        String getPath();
+    @Data
+    @Accessors(chain = true)
+    public static sealed abstract class TarFileSpec {
+        String path;
+        Integer mode;
 
-        Integer getMode();
-
+        @ToString(callSuper = true)
+        @EqualsAndHashCode(callSuper = true)
         @Data
         @Accessors(chain = true)
         @JsonIgnoreProperties(ignoreUnknown = true)
-        final class TextTarFileSpec implements TarFileSpec {
-            String path;
+        public static final class TextTarFileSpec extends TarFileSpec {
+            @NotBlank
             String content;
-            Integer mode;
         }
 
+        @ToString(callSuper = true)
+        @EqualsAndHashCode(callSuper = true)
         @Data
         @Accessors(chain = true)
         @JsonIgnoreProperties(ignoreUnknown = true)
-        final class BinaryTarFileSpec implements TarFileSpec {
-            String path;
+        public static final class BinaryTarFileSpec extends TarFileSpec {
+            @NotEmpty
             byte[] content;
-            Integer mode;
+        }
+
+        @ToString(callSuper = true)
+        @EqualsAndHashCode(callSuper = true)
+        @Data
+        @Accessors(chain = true)
+        @JsonIgnoreProperties(ignoreUnknown = true)
+        public static final class FileTarFileSpec extends TarFileSpec {
+            @NotBlank
+            String sourcePath;
+        }
+
+        @ToString(callSuper = true)
+        @EqualsAndHashCode(callSuper = true)
+        @Data
+        @Accessors(chain = true)
+        @JsonIgnoreProperties(ignoreUnknown = true)
+        public static final class UrlTarFileSpec extends TarFileSpec {
+            @NotNull
+            URI url;
+            String bearerToken;
+            LinkedHashMap<String, List<String>> headers;
         }
     }
 
@@ -113,7 +146,7 @@ public class DebPackageConfig {
     @Accessors(chain = true)
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class DebFileSpec {
-        List<TarFileSpec> controlFiles;
-        List<TarFileSpec> dataFiles;
+        List<@Valid TarFileSpec> controlFiles;
+        List<@Valid TarFileSpec> dataFiles;
     }
 }

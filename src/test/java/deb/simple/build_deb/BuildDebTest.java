@@ -46,9 +46,9 @@ class BuildDebTest {
                                 .setDescription("test_simpleInstall"))
                         .setFiles(new DebFileSpec()
                                 .setDataFiles(List.of(new DebPackageConfig.TarFileSpec.TextTarFileSpec()
+                                        .setContent("#!/usr/bin/env bash\necho test_simpleInstall")
                                         .setMode(0x755)
-                                        .setPath("/usr/bin/test_simpleInstall")
-                                        .setContent("#!/usr/bin/env bash\necho test_simpleInstall")))))
+                                        .setPath("/usr/bin/test_simpleInstall")))))
         );
 
         var fileName = meta.getDebFilename();

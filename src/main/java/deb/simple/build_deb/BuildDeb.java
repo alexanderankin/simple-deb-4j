@@ -6,8 +6,15 @@ import org.apache.commons.compress.archivers.ar.ArArchiveEntry;
 import org.apache.commons.compress.archivers.ar.ArArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+import org.springframework.core.io.Resource;
+import org.springframework.util.Assert;
+import org.springframework.util.CollectionUtils;
+import org.springframework.web.client.RestClient;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -33,8 +40,8 @@ public class BuildDeb {
         byte[] controlTarGz = createTarGz(
                 Optional.ofNullable(config.getFiles().getControlFiles()).orElseGet(List::of),
                 List.of(new DebPackageConfig.TarFileSpec.TextTarFileSpec()
-                        .setPath("control")
                         .setContent(config.getControl().render(config.getMeta()))
+                        .setPath("control")
                         .setMode(null))
         );
 
@@ -64,6 +71,8 @@ public class BuildDeb {
                 byte[] content = switch (f) {
                     case DebPackageConfig.TarFileSpec.TextTarFileSpec text -> text.getContent().getBytes();
                     case DebPackageConfig.TarFileSpec.BinaryTarFileSpec bin -> bin.getContent();
+                    case DebPackageConfig.TarFileSpec.FileTarFileSpec fs -> Files.readAllBytes(Path.of(fs.getSourcePath()));
+                    case DebPackageConfig.TarFileSpec.UrlTarFileSpec fs -> downloadUrlTarFile(fs);
                 };
                 TarArchiveEntry entry = new TarArchiveEntry(f.getPath());
                 entry.setSize(content.length);
@@ -78,6 +87,22 @@ public class BuildDeb {
             }
         }
         return out.toByteArray();
+    }
+
+    private static byte[] downloadUrlTarFile(DebPackageConfig.TarFileSpec.UrlTarFileSpec fs) {
+        byte[] result = RestClient.create()
+                .get()
+                .uri(fs.url)
+                .headers(h -> {
+                    if (!CollectionUtils.isEmpty(fs.getHeaders()))
+                        h.putAll(fs.getHeaders());
+                    if (fs.getBearerToken() != null)
+                        h.setBearerAuth(fs.getBearerToken());
+                })
+                .retrieve()
+                .body(byte[].class);
+        Assert.isTrue(result != null, "have result");
+        return result;
     }
 
     /**
