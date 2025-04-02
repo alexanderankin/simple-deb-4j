@@ -18,7 +18,7 @@ public enum DebArch {
     arm64("aarch64"),
     ;
 
-    public static final Map<String, DebArch> MAP = Arrays.stream(values())
+    private static final Map<String, DebArch> MAP = Arrays.stream(values())
             .collect(Collectors.toMap(DebArch::getJdkArchName, Function.identity()));
 
     private final String jdkArchName;

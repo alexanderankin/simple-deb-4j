@@ -1,0 +1,20 @@
+meta:
+  name: simple
+  version: 0.0.1
+  arch: amd64
+control:
+  depends: ""
+  recommends: ""
+  section: ""
+  priority: ""
+  homepage: ""
+  maintainer: "maintainer"
+  description: "description"
+files:
+  controlFiles:
+    - type: text
+      path: "postinst"
+      content: "touch /tmp/simple-postinst"
+      # noinspection YAMLSchemaValidation
+      mode: 0x755
+  dataFiles: []

@@ -1,5 +1,6 @@
 package deb.simple.build_deb;
 
+import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
 import deb.simple.DebArch;
 import deb.simple.build_deb.DebPackageConfig.ControlExtras;
 import deb.simple.build_deb.DebPackageConfig.DebFileSpec;
@@ -22,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class BuildDebTest {
 
     BuildDeb buildDeb = new BuildDeb();
+    YAMLMapper yamlMapper = (YAMLMapper) new YAMLMapper().findAndRegisterModules();
     ValidatorFactory validatorFactory = Validation.buildDefaultValidatorFactory();
     Validator validator = validatorFactory.getValidator();
 
@@ -67,6 +69,30 @@ class BuildDebTest {
             result = genericContainer.execInContainer("test_simpleInstall");
             assertEquals("", result.getStderr().strip());
             assertEquals("test_simpleInstall", result.getStdout().strip());
+            assertEquals(0, result.getExitCode());
+        }
+    }
+
+    @SneakyThrows
+    @Test
+    void test_installingEmptyPackageWithPostInst() {
+        var config = validate(yamlMapper.readValue(getClass().getResourceAsStream("simple.yaml"), DebPackageConfig.class));
+        config.getMeta().setArch(DebArch.current());
+        var fileName = config.getMeta().getDebFilename();
+        byte[] archive = new BuildDeb().buildDebToArchive(config);
+        assertEquals(1, config.getFiles().getControlFiles().size());
+        assertEquals(0x755, config.getFiles().getControlFiles().getFirst().getMode());
+
+        try (GenericContainer<?> genericContainer = new GenericContainer<>("debian:12-slim")) {
+            genericContainer
+                    .withCreateContainerCmdModifier(c -> c.withEntrypoint("tail", "-f", "/dev/null"))
+                    .withCopyToContainer(Transferable.of(archive), "/tmp/" + fileName);
+            genericContainer.start();
+            assertEquals(0, genericContainer.execInContainer("dpkg", "-i", "/tmp/" + fileName).getExitCode());
+
+            var result = genericContainer.execInContainer("cat", "/tmp/simple-postinst");
+            assertEquals("", result.getStderr().strip());
+            assertEquals("", result.getStdout().strip());
             assertEquals(0, result.getExitCode());
         }
     }
