@@ -25,6 +25,8 @@ import java.util.zip.GZIPOutputStream;
 
 @Slf4j
 public class BuildDeb {
+    Path current = Path.of(System.getProperty("user.dir"));
+
     @SneakyThrows
     public void buildDeb(DebPackageConfig config, Path outDir) {
         byte[] arArchive = buildDebToArchive(config);
@@ -71,7 +73,7 @@ public class BuildDeb {
                 byte[] content = switch (f) {
                     case DebPackageConfig.TarFileSpec.TextTarFileSpec text -> text.getContent().getBytes();
                     case DebPackageConfig.TarFileSpec.BinaryTarFileSpec bin -> bin.getContent();
-                    case DebPackageConfig.TarFileSpec.FileTarFileSpec fs -> Files.readAllBytes(Path.of(fs.getSourcePath()));
+                    case DebPackageConfig.TarFileSpec.FileTarFileSpec fs -> Files.readAllBytes(current.resolve(fs.getSourcePath()));
                     case DebPackageConfig.TarFileSpec.UrlTarFileSpec fs -> downloadUrlTarFile(fs);
                 };
                 TarArchiveEntry entry = new TarArchiveEntry(f.getPath());

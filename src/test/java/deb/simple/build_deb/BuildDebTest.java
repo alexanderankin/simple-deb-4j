@@ -1,6 +1,8 @@
 package deb.simple.build_deb;
 
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
+import com.google.common.jimfs.Configuration;
+import com.google.common.jimfs.Jimfs;
 import deb.simple.DebArch;
 import deb.simple.build_deb.DebPackageConfig.ControlExtras;
 import deb.simple.build_deb.DebPackageConfig.DebFileSpec;
@@ -11,11 +13,17 @@ import jakarta.validation.Validator;
 import jakarta.validation.ValidatorFactory;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.io.IOUtils;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.images.builder.Transferable;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.FileSystem;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
+import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -94,6 +102,33 @@ class BuildDebTest {
             assertEquals("", result.getStderr().strip());
             assertEquals("", result.getStdout().strip());
             assertEquals(0, result.getExitCode());
+        }
+    }
+
+    @SneakyThrows
+    @Test
+    void test_fileFileType() {
+        var config = validate(yamlMapper.readValue(getClass().getResourceAsStream("file-file.yaml"), DebPackageConfig.class));
+        config.getMeta().setArch(DebArch.current());
+        var fileName = config.getMeta().getDebFilename();
+
+        try (FileSystem fileSystem = Jimfs.newFileSystem(Configuration.unix())) {
+            Path path = fileSystem.getPath("/tmp");
+            Files.createDirectories(path);
+            Files.copy(Objects.requireNonNull(getClass().getResourceAsStream("my-file")), (path.resolve("my-file")));
+
+            BuildDeb buildDeb = new BuildDeb();
+            buildDeb.current = path;
+            byte[] archive = buildDeb.buildDebToArchive(config);
+
+            try (GenericContainer<?> genericContainer = new GenericContainer<>("debian:12-slim")) {
+                genericContainer
+                        .withCreateContainerCmdModifier(c -> c.withEntrypoint("tail", "-f", "/dev/null"))
+                        .withCopyToContainer(Transferable.of(archive), "/tmp/" + fileName);
+                genericContainer.start();
+                assertEquals(0, genericContainer.execInContainer("dpkg", "-i", "/tmp/" + fileName).getExitCode());
+                assertEquals("example content\n", genericContainer.copyFileFromContainer("/etc/file-file/my-file", i -> IOUtils.toString(i, StandardCharsets.UTF_8)));
+            }
         }
     }
 }

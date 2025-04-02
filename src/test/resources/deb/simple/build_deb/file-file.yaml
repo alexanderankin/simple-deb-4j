@@ -1,0 +1,22 @@
+meta:
+  name: file-file
+  version: 0.0.1
+  arch: amd64
+control:
+  depends: ""
+  recommends: ""
+  section: ""
+  priority: ""
+  homepage: ""
+  maintainer: "maintainer"
+  description: "description"
+files:
+  controlFiles:
+    - type: text
+      content: "mkdir /etc/file-file"
+      mode: 0x755
+      path: "preinst"
+  dataFiles:
+    - type: file
+      path: "/etc/file-file/my-file"
+      sourcePath: my-file
