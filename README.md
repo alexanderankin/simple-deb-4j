@@ -8,6 +8,7 @@ This project provides a library and command line tool for performing the debian 
   * fix schema for `file` file type (require `sourcePath` which exists, not `file` which does not)
   * add tests and use JimFs for file type test
   * use `Path#resolve` not `Path#of`: library can support virtual file systems
+  * add function to generate gpg key `simple-deb g gk "name" "email@example.com" -P public.gpg -K private.gpg`
 
 * version 0.0.3 - `Mon, 31 Mar 2025 23:39:30 -0400`
   * support `file` and `url` types of files
