@@ -4,6 +4,9 @@ This project provides a library and command line tool for performing the debian 
 
 ## changes
 
+* version 0.0.5
+  * add `-C` flag to build command
+
 * version 0.0.4 - `Fri, 04 Apr 2025 10:13:05 -0400`
   * fix schema for `file` file type (require `sourcePath` which exists, not `file` which does not)
   * add tests and use JimFs for file type test

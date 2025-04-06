@@ -1,6 +1,8 @@
 package deb.simple.build_deb;
 
+import lombok.Data;
 import lombok.SneakyThrows;
+import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.compress.archivers.ar.ArArchiveEntry;
 import org.apache.commons.compress.archivers.ar.ArArchiveOutputStream;
@@ -23,6 +25,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.zip.GZIPOutputStream;
 
+@Data
+@Accessors(chain = true)
 @Slf4j
 public class BuildDeb {
     Path current = Path.of(System.getProperty("user.dir"));

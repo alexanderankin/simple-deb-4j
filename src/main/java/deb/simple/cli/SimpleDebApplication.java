@@ -48,6 +48,8 @@ public class SimpleDebApplication {
         Path configFile;
         @Option(names = {"-o", "--output"}, description = "output directory")
         Path outDir;
+        @Option(names = {"-C"}, description = "change directory before running", defaultValue = "$PWD")
+        Path current = Path.of(System.getProperty("user.dir"));
 
         @SneakyThrows
         @Override
@@ -64,7 +66,9 @@ public class SimpleDebApplication {
                 var errors = validatorFactory.getValidator().validate(config);
                 if (!errors.isEmpty())
                     throw new ConstraintViolationException(errors);
-                new BuildDeb().buildDeb(config, outDir);
+                new BuildDeb()
+                        .setCurrent(current)
+                        .buildDeb(config, outDir);
             }
         }
     }
