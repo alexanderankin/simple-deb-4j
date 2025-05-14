@@ -115,6 +115,8 @@ public class DebPackageConfig {
         String priority = "optional";
         @NotNull
         String homepage = "";
+        @NotNull
+        String conflicts = "";
         @NotBlank
         String maintainer = "";
         @NotBlank
@@ -129,13 +131,17 @@ public class DebPackageConfig {
                             Section: %s
                             Priority: %s
                             Homepage: %s
+                            Conflicts: %s
                             Architecture: %s
                             Installed-Size: 10
                             Maintainer: %s
                             Description: %s
                             """,
+                    // optional fields
                     meta.getName(), meta.getVersion(), depends, recommends, section, priority,
-                    homepage, meta.getArch(), maintainer, description
+                    homepage, conflicts, meta.getArch(),
+                    // required fields
+                    maintainer, description
             ).strip() + "\n";
         }
     }

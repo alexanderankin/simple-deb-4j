@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 @Slf4j
 class BuildDebTest {
@@ -115,7 +116,7 @@ class BuildDebTest {
         try (FileSystem fileSystem = Jimfs.newFileSystem(Configuration.unix())) {
             Path path = fileSystem.getPath("/tmp");
             Files.createDirectories(path);
-            Files.copy(Objects.requireNonNull(getClass().getResourceAsStream("my-file")), (path.resolve("my-file")));
+            Files.copy(Objects.requireNonNull(getClass().getResourceAsStream("my-file")), path.resolve("my-file"));
 
             BuildDeb buildDeb = new BuildDeb();
             buildDeb.current = path;
@@ -128,6 +129,46 @@ class BuildDebTest {
                 genericContainer.start();
                 assertEquals(0, genericContainer.execInContainer("dpkg", "-i", "/tmp/" + fileName).getExitCode());
                 assertEquals("example content\n", genericContainer.copyFileFromContainer("/etc/file-file/my-file", i -> IOUtils.toString(i, StandardCharsets.UTF_8)));
+            }
+        }
+    }
+
+    @SneakyThrows
+    @Test
+    void test_conflicts() {
+        var aConfig = validate(new DebPackageConfig()
+                .setMeta(new PackageMeta().setName("conflicts-a").setVersion("0.0.1").setArch(DebArch.current()))
+                .setControl(new ControlExtras().setMaintainer("maintainer").setDescription("description").setConflicts("conflicts-b"))
+                .setFiles(new DebFileSpec().setDataFiles(List.of(new DebPackageConfig.TarFileSpec.TextTarFileSpec().setContent("a").setPath("/etc/conflicts-pkg"))))
+        );
+        var bConfig = validate(new DebPackageConfig()
+                .setMeta(new PackageMeta().setName("conflicts-b").setVersion("0.0.1").setArch(DebArch.current()))
+                .setControl(new ControlExtras().setMaintainer("maintainer").setDescription("description").setConflicts("conflicts-a"))
+                .setFiles(new DebFileSpec().setDataFiles(List.of(new DebPackageConfig.TarFileSpec.TextTarFileSpec().setContent("b").setPath("/etc/conflicts-pkg"))))
+        );
+
+        try (FileSystem fileSystem = Jimfs.newFileSystem(Configuration.unix())) {
+            Path path = fileSystem.getPath("/tmp");
+            Files.createDirectories(path);
+            Files.copy(Objects.requireNonNull(getClass().getResourceAsStream("my-file")), path.resolve("my-file"));
+
+            BuildDeb buildDeb = new BuildDeb();
+            buildDeb.current = path;
+            byte[] aArchive = buildDeb.buildDebToArchive(aConfig);
+            byte[] bArchive = buildDeb.buildDebToArchive(bConfig);
+
+            try (GenericContainer<?> genericContainer = new GenericContainer<>("debian:12-slim")) {
+                genericContainer
+                        .withCreateContainerCmdModifier(c -> c.withEntrypoint("tail", "-f", "/dev/null"))
+                        .withCopyToContainer(Transferable.of(aArchive), "/tmp/" + aConfig.getMeta().getDebFilename())
+                        .withCopyToContainer(Transferable.of(bArchive), "/tmp/" + bConfig.getMeta().getDebFilename());
+                genericContainer.start();
+                assertEquals(0, genericContainer.execInContainer("dpkg", "-i", "/tmp/" + aConfig.getMeta().getDebFilename()).getExitCode());
+                assertEquals("a", genericContainer.copyFileFromContainer("/etc/conflicts-pkg", i -> IOUtils.toString(i, StandardCharsets.UTF_8)));
+                assertNotEquals(0, genericContainer.execInContainer("dpkg", "-i", "/tmp/" + bConfig.getMeta().getDebFilename()).getExitCode());
+                assertEquals(0, genericContainer.execInContainer("dpkg", "--remove", "conflicts-a").getExitCode());
+                assertEquals(0, genericContainer.execInContainer("dpkg", "-i", "/tmp/" + bConfig.getMeta().getDebFilename()).getExitCode());
+                assertEquals("b", genericContainer.copyFileFromContainer("/etc/conflicts-pkg", i -> IOUtils.toString(i, StandardCharsets.UTF_8)));
             }
         }
     }
