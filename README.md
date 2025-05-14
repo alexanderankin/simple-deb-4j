@@ -4,8 +4,9 @@ This project provides a library and command line tool for performing the debian 
 
 ## changes
 
-* version 0.0.5
+* version 0.0.5 - `Wed, 14 May 2025 12:17:23 -0400`
   * add `-C` flag to build command
+  * conflicts support (in dto, control file template, and JSON schema for editing the config files)
 
 * version 0.0.4 - `Fri, 04 Apr 2025 10:13:05 -0400`
   * fix schema for `file` file type (require `sourcePath` which exists, not `file` which does not)
