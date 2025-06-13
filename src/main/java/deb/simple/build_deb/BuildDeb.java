@@ -8,15 +8,11 @@ import org.apache.commons.compress.archivers.ar.ArArchiveEntry;
 import org.apache.commons.compress.archivers.ar.ArArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
-import org.springframework.core.io.Resource;
 import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.client.RestClient;
 
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -33,9 +29,18 @@ public class BuildDeb {
 
     @SneakyThrows
     public void buildDeb(DebPackageConfig config, Path outDir) {
-        byte[] arArchive = buildDebToArchive(config);
+        buildDeb(config, outDir, false);
+    }
 
-        Path output = outDir.resolve(config.getMeta().getDebFilename());
+    @SneakyThrows
+    public void buildDeb(DebPackageConfig config, Path outDir, boolean skipData) {
+        byte[] arArchive = buildDebToArchive(config, skipData);
+
+        String debFilename = config.getMeta().getDebFilename();
+        if (skipData) {
+            debFilename += ".simple-deb-4j-index";
+        }
+        Path output = outDir.resolve(debFilename);
         Files.createDirectories(outDir);
         Files.write(output, arArchive);
 
@@ -43,6 +48,10 @@ public class BuildDeb {
     }
 
     public byte[] buildDebToArchive(DebPackageConfig config) {
+        return buildDebToArchive(config, false);
+    }
+
+    public byte[] buildDebToArchive(DebPackageConfig config, boolean skipData) {
         byte[] controlTarGz = createTarGz(
                 Optional.ofNullable(config.getFiles().getControlFiles()).orElseGet(List::of),
                 List.of(new DebPackageConfig.TarFileSpec.TextTarFileSpec()
@@ -52,7 +61,7 @@ public class BuildDeb {
         );
 
         byte[] dataTarGz = createTarGz(
-                Optional.ofNullable(config.getFiles().getDataFiles()).orElseGet(List::of),
+                skipData ? List.of() : Optional.ofNullable(config.getFiles().getDataFiles()).orElseGet(List::of),
                 List.of()
         );
 

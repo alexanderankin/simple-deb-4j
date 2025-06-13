@@ -4,6 +4,11 @@ This project provides a library and command line tool for performing the debian 
 
 ## changes
 
+* version 0.0.6
+  * add ability to also create `.deb.simple-deb-4j-index` files to reduce indexing IO
+    * these files are like the `.deb` except excluding the `data.tar.gz`
+    * you can download these files, rename them to `.deb` and index as with the full files
+
 * version 0.0.5 - `Wed, 14 May 2025 12:17:23 -0400`
   * add `-C` flag to build command
   * conflicts support (in dto, control file template, and JSON schema for editing the config files)

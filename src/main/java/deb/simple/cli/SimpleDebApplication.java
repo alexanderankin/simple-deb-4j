@@ -48,6 +48,8 @@ public class SimpleDebApplication {
         Path configFile;
         @Option(names = {"-o", "--output"}, description = "output directory")
         Path outDir;
+        @Option(names = {"-i", "--index"}, description = "produce index package - suitable for indexing but not installable")
+        boolean index = false;
         @Option(names = {"-C"}, description = "change directory before running", defaultValue = "$PWD")
         Path current = Path.of(System.getProperty("user.dir"));
 
@@ -68,7 +70,7 @@ public class SimpleDebApplication {
                     throw new ConstraintViolationException(errors);
                 new BuildDeb()
                         .setCurrent(current)
-                        .buildDeb(config, outDir);
+                        .buildDeb(config, outDir, index);
             }
         }
     }
