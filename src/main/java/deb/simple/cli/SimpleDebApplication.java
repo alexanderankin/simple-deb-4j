@@ -23,7 +23,7 @@ import java.nio.file.Path;
 @Slf4j
 @Command(
         name = "simple-deb",
-        description = "simple debian packaging utility",
+        description = "simple debian packaging and repository utility",
         versionProvider = ManifestVersionProvider.class,
         mixinStandardHelpOptions = true,
         sortOptions = false,
