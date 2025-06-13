@@ -11,6 +11,9 @@ repositories {
 
 application.mainClass.set 'deb.simple.cli.SimpleDebApplication'
 
+version = file('version.txt').text.trim()
+jar.manifest.attributes(['Implementation-Version': version])
+
 // lombok
 configurations {
     testAnnotationProcessor.extendsFrom annotationProcessor
@@ -42,12 +45,12 @@ dependencies {
 
 tasks.withType(Test).configureEach { useJUnitPlatform() }
 
-tasks.named('assemble').get().dependsOn tasks.register('copyFilesLibs', Copy) {
+tasks.named('assemble').get().dependsOn tasks.register('ghaCopyFilesLibs', Copy) {
     from tasks.named('shadowJar')
     into 'build/public'
 }
 
-tasks.named('assemble').get().dependsOn tasks.register('copyFilesSrcPublic', Copy) {
+tasks.named('assemble').get().dependsOn tasks.register('ghaCopyFilesSrcPublic', Copy) {
     from 'src/public'
     into 'build/public'
 }

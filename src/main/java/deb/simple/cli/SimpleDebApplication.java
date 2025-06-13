@@ -24,7 +24,7 @@ import java.nio.file.Path;
 @Command(
         name = "simple-deb",
         description = "simple debian packaging utility",
-        version = "0.0.1",
+        versionProvider = ManifestVersionProvider.class,
         mixinStandardHelpOptions = true,
         sortOptions = false,
         showDefaultValues = true,
