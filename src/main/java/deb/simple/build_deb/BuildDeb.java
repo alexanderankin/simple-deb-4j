@@ -36,10 +36,7 @@ public class BuildDeb {
     public void buildDeb(DebPackageConfig config, Path outDir, boolean skipData) {
         byte[] arArchive = buildDebToArchive(config, skipData);
 
-        String debFilename = config.getMeta().getDebFilename();
-        if (skipData) {
-            debFilename += ".simple-deb-4j-index";
-        }
+        String debFilename = config.getMeta().getDebFilename(skipData);
         Path output = outDir.resolve(debFilename);
         Files.createDirectories(outDir);
         Files.write(output, arArchive);

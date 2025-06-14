@@ -12,11 +12,11 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 import lombok.experimental.Accessors;
+import org.apache.commons.codec.digest.DigestUtils;
 
 import java.net.URI;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 @Data
 @Accessors(chain = true)
@@ -96,8 +96,8 @@ public class DebPackageConfig {
         @NotNull
         DebArch arch;
 
-        public String getDebFilename() {
-            return name + "_" + version + "_" + arch + ".deb";
+        public String getDebFilename(boolean indexFileName) {
+            return name + "_" + version + "_" + arch + (indexFileName ? ".deb.simple-deb-4j-index" : ".deb");
         }
     }
 
@@ -117,6 +117,10 @@ public class DebPackageConfig {
         String homepage = "";
         @NotNull
         String conflicts = "";
+        @NotNull
+        String breaks = "";
+        @NotNull
+        String replaces = "";
         @NotBlank
         String maintainer = "";
         @NotBlank
@@ -132,17 +136,20 @@ public class DebPackageConfig {
                             Priority: %s
                             Homepage: %s
                             Conflicts: %s
+                            Breaks: %s
                             Architecture: %s
-                            Installed-Size: 10
+                            MD5sum: %s
+                            SHA1: %s
+                            SHA256: %s
+                            SHA512: %s
                             Maintainer: %s
-                            Description: %s
-                            """,
+                            Description: %s""",
                     // optional fields
                     meta.getName(), meta.getVersion(), depends, recommends, section, priority,
-                    homepage, conflicts, meta.getArch(),
+                    homepage, conflicts, breaks, meta.getArch(),
                     // required fields
                     maintainer, description
-            ).strip() + "\n";
+            ) + "\n";
         }
     }
 

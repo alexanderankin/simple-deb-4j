@@ -1,0 +1,23 @@
+# yaml-language-server: $schema=../../../../../public/simple-deb-config-schema.json
+meta:
+  name: hello
+  version: 0.1.0
+  arch: amd64
+control:
+  depends: ''
+  recommends: ''
+  section: 'main'
+  priority: 'optional'
+  homepage: ''
+  maintainer: hello-maintainer
+  description: package containing a greeting script
+files:
+  controlFiles: [ ]
+  dataFiles:
+    - type: text
+      path: /usr/bin/hello
+      # noinspection YAMLSchemaValidation
+      mode: 0x755
+      content: |
+        #!/usr/bin/env bash
+        echo "Hello, ${1:-world}!"

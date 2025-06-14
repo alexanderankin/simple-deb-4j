@@ -63,7 +63,7 @@ class BuildDebTest {
                                         .setPath("/usr/bin/test_simpleInstall")))))
         );
 
-        var fileName = meta.getDebFilename();
+        var fileName = meta.getDebFilename(false);
 
         try (GenericContainer<?> genericContainer = new GenericContainer<>("debian:12-slim")) {
             genericContainer
@@ -87,7 +87,7 @@ class BuildDebTest {
     void test_installingEmptyPackageWithPostInst() {
         var config = validate(yamlMapper.readValue(getClass().getResourceAsStream("simple.yaml"), DebPackageConfig.class));
         config.getMeta().setArch(DebArch.current());
-        var fileName = config.getMeta().getDebFilename();
+        var fileName = config.getMeta().getDebFilename(false);
         byte[] archive = new BuildDeb().buildDebToArchive(config);
         assertEquals(1, config.getFiles().getControlFiles().size());
         assertEquals(0x755, config.getFiles().getControlFiles().getFirst().getMode());
@@ -111,7 +111,7 @@ class BuildDebTest {
     void test_fileFileType() {
         var config = validate(yamlMapper.readValue(getClass().getResourceAsStream("file-file.yaml"), DebPackageConfig.class));
         config.getMeta().setArch(DebArch.current());
-        var fileName = config.getMeta().getDebFilename();
+        var fileName = config.getMeta().getDebFilename(false);
 
         try (FileSystem fileSystem = Jimfs.newFileSystem(Configuration.unix())) {
             Path path = fileSystem.getPath("/tmp");
@@ -160,14 +160,14 @@ class BuildDebTest {
             try (GenericContainer<?> genericContainer = new GenericContainer<>("debian:12-slim")) {
                 genericContainer
                         .withCreateContainerCmdModifier(c -> c.withEntrypoint("tail", "-f", "/dev/null"))
-                        .withCopyToContainer(Transferable.of(aArchive), "/tmp/" + aConfig.getMeta().getDebFilename())
-                        .withCopyToContainer(Transferable.of(bArchive), "/tmp/" + bConfig.getMeta().getDebFilename());
+                        .withCopyToContainer(Transferable.of(aArchive), "/tmp/" + aConfig.getMeta().getDebFilename(false))
+                        .withCopyToContainer(Transferable.of(bArchive), "/tmp/" + bConfig.getMeta().getDebFilename(false));
                 genericContainer.start();
-                assertEquals(0, genericContainer.execInContainer("dpkg", "-i", "/tmp/" + aConfig.getMeta().getDebFilename()).getExitCode());
+                assertEquals(0, genericContainer.execInContainer("dpkg", "-i", "/tmp/" + aConfig.getMeta().getDebFilename(false)).getExitCode());
                 assertEquals("a", genericContainer.copyFileFromContainer("/etc/conflicts-pkg", i -> IOUtils.toString(i, StandardCharsets.UTF_8)));
-                assertNotEquals(0, genericContainer.execInContainer("dpkg", "-i", "/tmp/" + bConfig.getMeta().getDebFilename()).getExitCode());
+                assertNotEquals(0, genericContainer.execInContainer("dpkg", "-i", "/tmp/" + bConfig.getMeta().getDebFilename(false)).getExitCode());
                 assertEquals(0, genericContainer.execInContainer("dpkg", "--remove", "conflicts-a").getExitCode());
-                assertEquals(0, genericContainer.execInContainer("dpkg", "-i", "/tmp/" + bConfig.getMeta().getDebFilename()).getExitCode());
+                assertEquals(0, genericContainer.execInContainer("dpkg", "-i", "/tmp/" + bConfig.getMeta().getDebFilename(false)).getExitCode());
                 assertEquals("b", genericContainer.copyFileFromContainer("/etc/conflicts-pkg", i -> IOUtils.toString(i, StandardCharsets.UTF_8)));
             }
         }
