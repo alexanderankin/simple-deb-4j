@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
 import deb.simple.build_deb.BuildDeb;
+import deb.simple.build_deb.BuildIndex;
 import deb.simple.build_deb.DebPackageConfig;
 import deb.simple.gpg.GenerateGpgKey;
 import jakarta.validation.ConstraintViolationException;
@@ -38,6 +39,7 @@ import java.nio.file.Path;
 public class SimpleDebApplication {
 
     public static void main(String[] args) {
+        args = new String[]{"b", "-c", "/home/toor/IdeaProjects/simple-deb-4j/src/test/resources/deb/simple/build_deb/simple.yaml", "-o", "/tmp/tmp.MTtdYc3eNo", "-i"};
         int exitCode = new CommandLine(SimpleDebApplication.class).execute(args);
         System.exit(exitCode);
     }
@@ -50,7 +52,7 @@ public class SimpleDebApplication {
         Path outDir;
         @Option(names = {"-i", "--index"}, description = "produce index package - suitable for indexing but not installable")
         boolean index = false;
-        @Option(names = {"-C"}, description = "change directory before running", defaultValue = "$PWD")
+        @Option(names = {"-C"}, description = "change directory before running (defaults to $PWD)")
         Path current = Path.of(System.getProperty("user.dir"));
 
         @SneakyThrows
@@ -68,10 +70,12 @@ public class SimpleDebApplication {
                 var errors = validatorFactory.getValidator().validate(config);
                 if (!errors.isEmpty())
                     throw new ConstraintViolationException(errors);
-                new BuildDeb()
-                        .setCurrent(current)
-                        .buildDeb(config, outDir, index);
             }
+            var deb = new BuildDeb()
+                    .setCurrent(current)
+                    .buildDeb(config, outDir);
+            if (index)
+                new BuildIndex().buildDebIndex(deb, config, outDir);
         }
     }
 

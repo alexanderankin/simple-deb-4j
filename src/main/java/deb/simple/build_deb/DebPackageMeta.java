@@ -9,6 +9,7 @@ import lombok.experimental.Accessors;
 public class DebPackageMeta {
     DebPackageConfig debPackageConfig;
     Hashes hashes;
+    Integer size;
 
     @Data
     @Accessors(chain = true)

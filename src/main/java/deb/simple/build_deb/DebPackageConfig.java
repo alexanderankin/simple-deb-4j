@@ -12,6 +12,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 import lombok.experimental.Accessors;
+import org.apache.commons.lang3.StringUtils;
 
 import java.net.URI;
 import java.util.LinkedHashMap;
@@ -112,9 +113,9 @@ public class DebPackageConfig {
         String depends = "";
         @NotNull
         String recommends = "";
-        @NotNull
+        @NotBlank
         String section = "main";
-        @NotNull
+        @NotBlank
         String priority = "optional";
         @NotNull
         String homepage = "";
@@ -124,6 +125,16 @@ public class DebPackageConfig {
         String maintainer = "";
         @NotBlank
         String description = "";
+
+        public ControlExtras setSection(String section) {
+            this.section = StringUtils.isBlank(section) ? "main" : section;
+            return this;
+        }
+
+        public ControlExtras setPriority(String priority) {
+            this.priority = StringUtils.isBlank(priority) ? "optional" : priority;
+            return this;
+        }
 
         public String render(PackageMeta meta) {
             return String.format("""
