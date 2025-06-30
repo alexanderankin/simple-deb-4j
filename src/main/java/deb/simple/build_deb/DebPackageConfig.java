@@ -16,7 +16,6 @@ import lombok.experimental.Accessors;
 import java.net.URI;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 @Data
 @Accessors(chain = true)
@@ -98,6 +97,10 @@ public class DebPackageConfig {
 
         public String getDebFilename() {
             return name + "_" + version + "_" + arch + ".deb";
+        }
+
+        public String getIndexFilename() {
+            return name + "_" + version + "_" + arch + ".simple-deb-4j-index.json";
         }
     }
 
