@@ -28,6 +28,10 @@
           "type": "string",
           "minLength": 1
         },
+        "codename": {
+          "type": "string",
+          "enum": ["bionic", "focal", "jammy", "noble", "bullseye", "bookworm", "trixie", "forky"]
+        },
         "arch": {
           "type": "string",
           "enum": ["amd64", "aarch64"],

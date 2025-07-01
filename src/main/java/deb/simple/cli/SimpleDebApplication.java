@@ -1,25 +1,37 @@
 package deb.simple.cli;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
-import deb.simple.build_deb.BuildDeb;
-import deb.simple.build_deb.BuildIndex;
-import deb.simple.build_deb.DebPackageConfig;
+import deb.simple.DebArch;
+import deb.simple.build_deb.*;
 import deb.simple.gpg.GenerateGpgKey;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validation;
 import jakarta.validation.ValidatorFactory;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
+import org.apache.commons.compress.compressors.gzip.GzipUtils;
+import org.apache.commons.io.input.TeeInputStream;
+import org.bouncycastle.util.io.TeeOutputStream;
 import org.pgpainless.key.generation.type.rsa.RsaLength;
 import picocli.AutoComplete;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
+import java.io.ByteArrayOutputStream;
+import java.io.FileOutputStream;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
+import java.util.*;
+
+import static deb.simple.build_deb.DebPackageConfig.PackageMeta.SD_INDEX_EXTENSION;
 
 @Slf4j
 @Command(
@@ -32,6 +44,7 @@ import java.nio.file.Path;
         scope = CommandLine.ScopeType.INHERIT,
         subcommands = {
                 SimpleDebApplication.Build.class,
+                SimpleDebApplication.BuildRepo.class,
                 SimpleDebApplication.Gpg.class,
                 AutoComplete.GenerateCompletion.class,
         }
@@ -76,6 +89,121 @@ public class SimpleDebApplication {
                     .buildDeb(config, outDir);
             if (index)
                 new BuildIndex().buildDebIndex(deb, config, outDir);
+        }
+    }
+
+    @Command(name = "repo", aliases = {"r"}, description = "build a debian repository")
+    static class BuildRepo implements Runnable {
+        ObjectMapper o = new ObjectMapper().findAndRegisterModules();
+
+        @Option(names = {"-i", "--input", "--input-dir", "--index-dir"}, description = "directory with index files (./$codename/**/*.deb")
+        Path indexDir;
+
+        @Option(names = {"-o", "--output", "--output-dir"}, description = "output directory: 'dists' (for 'Release', 'main/binary-$arch/Packages')")
+        Path outDir;
+
+        @Option(names = {"-c", "--codename"}, description = "which codenames to process (or all, if none specified)")
+        List<String> codenames;
+
+        @SneakyThrows
+        @Override
+        public void run() {
+            List<String> codeNamesFiltered = determineCodenames();
+            for (String codename : codeNamesFiltered) {
+                var builder = new BuildPackagesIndex(codename).builder();
+                try (var files = Files.walk(indexDir.resolve(codename))) {
+                    files
+                            .filter(file -> file.getFileName().toString().endsWith(SD_INDEX_EXTENSION))
+                            .map(this::readValue)
+                            .forEach(builder::add);
+                }
+
+                Map<DebArch, String> packagesFilesByArch = builder.buildByArch();
+                Map<String, FileIntegrity> packagesFilesIntegrity = new HashMap<>();
+                for (var entry : packagesFilesByArch.entrySet()) {
+                    DebArch arch = entry.getKey();
+                    String packagesContent = entry.getValue();
+
+                    Path relative = Path.of(codename, "main", "binary-" + arch, "Packages");
+                    String relativePathString = relative.toString();
+                    Path outFile = outDir.resolve(relative);
+
+                    // noinspection ResultOfMethodCallIgnored
+                    outFile.getParent().toFile().mkdirs();
+                    Files.writeString(outFile, packagesContent);
+                    packagesFilesIntegrity.put(relativePathString, FileIntegrity.of(packagesContent, relativePathString));
+
+                    // also produce Packages.gz
+                    String relativePathStringGz = GzipUtils.getCompressedFileName(relativePathString);
+
+                    ByteArrayOutputStream packagesGzContents = new ByteArrayOutputStream();
+                    try (var in = Files.newInputStream(outFile);
+                         var t = new TeeInputStream(in, packagesGzContents, true);
+                         var out = new GzipCompressorOutputStream(new FileOutputStream(outDir.resolve(relativePathStringGz).toString()))) {
+                        t.transferTo(out);
+                    }
+
+                    packagesFilesIntegrity.put(relativePathStringGz, FileIntegrity.of(packagesGzContents.toByteArray(), relativePathStringGz));
+                }
+
+                String releaseContent = new BuildRelease()
+                        .buildReleaseToString(new BuildRelease.RepoRelease()
+                                .setCodename(builder.codename())
+                                .setNow(Instant.now())
+                                .setArches(builder.arches())
+                                .setComponents(builder.components())
+                                .setPackagesHashes(packagesFilesIntegrity)
+                        );
+
+                Files.writeString(outDir.resolve(Path.of(codename, "Release")), releaseContent);
+            }
+        }
+
+        private List<String> determineCodenames() {
+            List<String> codeNamesFound = readCodeNames();
+            List<String> codeNamesFiltered = filterCodeNames(codeNamesFound);
+            log.info("using codename list: {} in directory {} based on filter list: {}", codeNamesFiltered, indexDir, codenames);
+            if (codenames != null && codeNamesFound.size() != codenames.size())
+                log.warn("codenames were specified and filtered down to {} from {}", codeNamesFiltered, codeNamesFound);
+            return codeNamesFiltered;
+        }
+
+        private List<String> readCodeNames() {
+            return Arrays.stream(Objects.requireNonNull(
+                            indexDir.toFile().list(),
+                            () -> "directory " + indexDir + " has no contents"
+                    ))
+                    .sorted()
+                    .toList();
+        }
+
+        private List<String> filterCodeNames(List<String> codeNamesFound) {
+            if (codenames == null || codenames.isEmpty()) {
+                return codeNamesFound;
+            } else {
+                return codeNamesFound.stream().filter(codenames::contains).toList();
+            }
+        }
+
+        @SneakyThrows
+        DebPackageMeta readValue(Path i) {
+            return o.readValue(i.toFile(), DebPackageMeta.class);
+        }
+
+        @Command(name = "s3", description = "build a debian repository to/from s3")
+        public void s3(
+                @Option(names = {"--s3-url"}, description = "input/output directory (for 'pool', 'dists', 'Release', 'main/binary-$arch/Packages')")
+                URI s3Url
+        ) {
+        }
+
+        @Command(name = "s3-repo", description = "build a debian repository to/from s3")
+        public void s3Repo(
+                @Option(names = {"-i", "--index-dir"}, description = "directory with index files ('pool')")
+                Path indexDir,
+                @Option(names = {"--s3-url"}, description = "output directory (for 'dists', 'Release', 'main/binary-$arch/Packages')")
+                URI s3Url
+        ) {
         }
     }
 

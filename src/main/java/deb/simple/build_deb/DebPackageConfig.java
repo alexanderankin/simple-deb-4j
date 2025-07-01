@@ -89,6 +89,7 @@ public class DebPackageConfig {
     @Accessors(chain = true)
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class PackageMeta {
+        public static final String SD_INDEX_EXTENSION = ".simple-deb-4j-index.json";
         @NotBlank
         String name;
         @NotBlank
@@ -101,7 +102,7 @@ public class DebPackageConfig {
         }
 
         public String getIndexFilename() {
-            return name + "_" + version + "_" + arch + ".simple-deb-4j-index.json";
+            return name + "_" + version + "_" + arch + SD_INDEX_EXTENSION;
         }
     }
 
