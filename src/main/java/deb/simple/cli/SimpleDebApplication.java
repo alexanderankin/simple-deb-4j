@@ -92,6 +92,7 @@ public class SimpleDebApplication {
         }
     }
 
+    @Slf4j
     @Command(name = "repo", aliases = {"r"}, description = "build a debian repository")
     static class BuildRepo implements Runnable {
         ObjectMapper o = new ObjectMapper().findAndRegisterModules();
@@ -108,54 +109,26 @@ public class SimpleDebApplication {
         @SneakyThrows
         @Override
         public void run() {
+            var buildRepository = new BuildRepository();
+            var repoBuilder = buildRepository.repoBuilder();
+
             List<String> codeNamesFiltered = determineCodenames();
             for (String codename : codeNamesFiltered) {
-                var builder = new BuildPackagesIndex(codename).builder();
+                var builder = repoBuilder.buildCodeName(codename);
                 try (var files = Files.walk(indexDir.resolve(codename))) {
                     files
                             .filter(file -> file.getFileName().toString().endsWith(SD_INDEX_EXTENSION))
                             .map(this::readValue)
-                            .forEach(builder::add);
+                            .forEach(builder::addIndex);
                 }
+                builder.build();
+            }
 
-                Map<DebArch, String> packagesFilesByArch = builder.buildByArch();
-                Map<String, FileIntegrity> packagesFilesIntegrity = new HashMap<>();
-                for (var entry : packagesFilesByArch.entrySet()) {
-                    DebArch arch = entry.getKey();
-                    String packagesContent = entry.getValue();
-
-                    Path relative = Path.of(codename, "main", "binary-" + arch, "Packages");
-                    String relativePathString = relative.toString();
-                    Path outFile = outDir.resolve(relative);
-
-                    // noinspection ResultOfMethodCallIgnored
-                    outFile.getParent().toFile().mkdirs();
-                    Files.writeString(outFile, packagesContent);
-                    packagesFilesIntegrity.put(relativePathString, FileIntegrity.of(packagesContent, relativePathString));
-
-                    // also produce Packages.gz
-                    String relativePathStringGz = GzipUtils.getCompressedFileName(relativePathString);
-
-                    ByteArrayOutputStream packagesGzContents = new ByteArrayOutputStream();
-                    try (var in = Files.newInputStream(outFile);
-                         var t = new TeeInputStream(in, packagesGzContents, true);
-                         var out = new GzipCompressorOutputStream(new FileOutputStream(outDir.resolve(relativePathStringGz).toString()))) {
-                        t.transferTo(out);
-                    }
-
-                    packagesFilesIntegrity.put(relativePathStringGz, FileIntegrity.of(packagesGzContents.toByteArray(), relativePathStringGz));
-                }
-
-                String releaseContent = new BuildRelease()
-                        .buildReleaseToString(new BuildRelease.RepoRelease()
-                                .setCodename(builder.codename())
-                                .setNow(Instant.now())
-                                .setArches(builder.arches())
-                                .setComponents(builder.components())
-                                .setPackagesHashes(packagesFilesIntegrity)
-                        );
-
-                Files.writeString(outDir.resolve(Path.of(codename, "Release")), releaseContent);
+            var repo = repoBuilder.build();
+            var files = buildRepository.buildRepo(repo);
+            for (var fileEntry : files.entrySet()) {
+                log.info("writing file {} relative to dir {}", fileEntry.getKey(), outDir);
+                Files.write(outDir.resolve(fileEntry.getKey()), fileEntry.getValue().getContent());
             }
         }
 

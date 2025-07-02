@@ -3,6 +3,7 @@ plugins {
     id 'application'
     id 'com.google.cloud.tools.jib' version '3.4.5'
     id 'com.gradleup.shadow' version '9.0.0-beta11'
+    id 'jacoco'
 }
 
 repositories {

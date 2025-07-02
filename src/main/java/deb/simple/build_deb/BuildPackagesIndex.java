@@ -1,13 +1,8 @@
 package deb.simple.build_deb;
 
-import deb.simple.DebArch;
-import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 public class BuildPackagesIndex {
@@ -45,7 +40,7 @@ public class BuildPackagesIndex {
                 .append("pool/").append(poolPath).append("/")
                 .append(meta.getDebFilename()).append("\n");
         sb.append("Size: ").append(debPackageMeta.getSize()).append("\n");
-        sb.append("MD5sum: ").append(debPackageMeta.getHashes().getMd5sum()).append("\n");
+        sb.append("MD5sum: ").append(debPackageMeta.getHashes().getMd5()).append("\n");
         sb.append("SHA1: ").append(debPackageMeta.getHashes().getSha1()).append("\n");
         sb.append("SHA256: ").append(debPackageMeta.getHashes().getSha256()).append("\n");
         sb.append("SHA512: ").append(debPackageMeta.getHashes().getSha512()).append("\n");
@@ -57,40 +52,5 @@ public class BuildPackagesIndex {
         sb.append("Description: ").append(control.getDescription()).append("\n");
 
         return sb.toString();
-    }
-
-    public IndexBuilder builder() {
-        return new IndexBuilder(this);
-    }
-
-    @RequiredArgsConstructor
-    public static class IndexBuilder {
-        final BuildPackagesIndex bpi;
-        final List<DebPackageMeta> metaList = new ArrayList<>();
-
-        public void add(DebPackageMeta debPackageMeta) {
-            metaList.add(debPackageMeta);
-        }
-
-        public Map<DebArch, String> buildByArch() {
-            Map<DebArch, List<DebPackageMeta>> byArch = metaList.stream()
-                    .collect(Collectors.groupingBy(g -> g.getDebPackageConfig().getMeta().getArch()));
-
-            return byArch.entrySet().stream()
-                    .map(e -> Map.entry(e.getKey(), bpi.buildPackagesIndex(e.getValue())))
-                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-        }
-
-        public Set<DebArch> arches() {
-            return metaList.stream().map(DebPackageMeta::getDebPackageConfig).map(DebPackageConfig::getMeta).map(DebPackageConfig.PackageMeta::getArch).collect(Collectors.toSet());
-        }
-
-        public Set<String> components() {
-            return metaList.stream().map(DebPackageMeta::getDebPackageConfig).map(DebPackageConfig::getControl).map(DebPackageConfig.ControlExtras::getSection).collect(Collectors.toSet());
-        }
-
-        public String codename() {
-            return bpi.poolPath;
-        }
     }
 }

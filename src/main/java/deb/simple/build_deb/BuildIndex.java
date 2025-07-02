@@ -2,7 +2,6 @@ package deb.simple.build_deb;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.SneakyThrows;
-import org.apache.commons.codec.digest.DigestUtils;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -26,11 +25,7 @@ public class BuildIndex {
     public DebPackageMeta buildDebIndexToDto(byte[] deb, DebPackageConfig config) {
         return new DebPackageMeta()
                 .setDebPackageConfig(config)
-                .setHashes(new DebPackageMeta.Hashes()
-                        .setMd5sum(DigestUtils.md5Hex(deb))
-                        .setSha1(DigestUtils.md5Hex(deb))
-                        .setSha256(DigestUtils.md5Hex(deb))
-                        .setSha512(DigestUtils.md5Hex(deb)))
+                .setHashes(FileIntegrity.of(deb, null))
                 .setSize(deb.length);
     }
 }
