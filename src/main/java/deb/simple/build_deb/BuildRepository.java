@@ -46,7 +46,7 @@ public class BuildRepository {
      */
     public Map<String, FileIntegrity> buildRepo(Repo repo) {
         return repo.codenameSectionMap().entrySet().stream()
-                .flatMap(e -> e.getValue().packagesFiles().entrySet().stream())
+                .flatMap(e -> e.getValue().packagesFiles().entrySet().stream().map(ee -> Map.entry(e.getValue().getCodename() + "/" + ee.getKey(), ee.getValue())))
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 

@@ -1,7 +1,12 @@
 package deb.simple.build_deb;
 
 import deb.simple.DebArch;
+import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
+import org.testcontainers.containers.Container;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.images.builder.Transferable;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -9,8 +14,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+@Slf4j
 class BuildRepositoryTest {
 
     @Test
@@ -37,7 +45,7 @@ class BuildRepositoryTest {
                 .collect(Collectors.toMap(Map.Entry::getKey, e -> new String(e.getValue().getContent(), StandardCharsets.UTF_8)));
 
         assertEquals(Map.ofEntries(
-                Map.entry("main/binary-amd64/Packages", """
+                Map.entry("jammy/main/binary-amd64/Packages", """
                         Package: hello
                         Version: 0.0.1
                         Architecture: amd64
@@ -52,7 +60,7 @@ class BuildRepositoryTest {
                         Priority: optional
                         Description: description
                         """),
-                Map.entry("Release", """
+                Map.entry("jammy/Release", """
                         Architectures: amd64
                         Codename: jammy
                         Components: main
@@ -76,5 +84,97 @@ class BuildRepositoryTest {
                          7bdd10b20d55cb4e9ea9aa83f9942aa13c052026d03e040647f543642421adc897d7c3cb54e46a226116aa7774cd25fbe5ae97ae81a68d43853fb55ec4715735              351 main/binary-amd64/Packages.gz
                         """)
         ), fileStrings);
+    }
+
+    @SneakyThrows
+    @Test
+    void test_installable() {
+        var commonPackage = new BuildDebTest().validate(new DebPackageConfig()
+                .setMeta(new DebPackageConfig.PackageMeta().setName("common-package").setVersion("0.0.1").setArch(DebArch.current()))
+                .setControl(new DebPackageConfig.ControlExtras().setMaintainer("maintainer").setDescription("description"))
+                .setFiles(new DebPackageConfig.DebFileSpec()
+                        .setDataFiles(List.of(new DebPackageConfig.TarFileSpec.TextTarFileSpec()
+                                .setContent("#!/usr/bin/env bash\necho '0.0.1'\n")
+                                .setPath("/usr/bin/common-package")
+                                .setMode(0x755))))
+        );
+
+        var jqVersionReporter = new BuildDebTest().validate(new DebPackageConfig()
+                .setMeta(new DebPackageConfig.PackageMeta().setName("jq-version-reporter").setVersion("0.0.1").setArch(DebArch.current()))
+                .setControl(new DebPackageConfig.ControlExtras().setMaintainer("maintainer").setDescription("description").setDepends("common-package").setConflicts("jq-vr2"))
+                .setFiles(new DebPackageConfig.DebFileSpec()
+                        .setDataFiles(List.of(new DebPackageConfig.TarFileSpec.TextTarFileSpec()
+                                .setContent("#!/usr/bin/env bash\necho 'welcome to jq-version-reporter'\ncommon-package\n")
+                                .setPath("/usr/bin/jqr")
+                                .setMode(0x755))))
+        );
+
+        var jqVR2 = new BuildDebTest().validate(new DebPackageConfig()
+                .setMeta(new DebPackageConfig.PackageMeta().setName("jq-vr2").setVersion("0.0.1").setArch(DebArch.current()))
+                .setControl(new DebPackageConfig.ControlExtras().setMaintainer("maintainer").setDescription("description").setDepends("common-package").setConflicts("jq-version-reporter"))
+                .setFiles(new DebPackageConfig.DebFileSpec()
+                        .setDataFiles(List.of(new DebPackageConfig.TarFileSpec.TextTarFileSpec()
+                                .setContent("#!/usr/bin/env bash\necho 'welcome to jq-vr2'\ncommon-package\n")
+                                .setPath("/usr/bin/jqr")
+                                .setMode(0x755))))
+        );
+
+        BuildDeb buildDeb = new BuildDeb();
+        byte[] commonPackageArchive = buildDeb.buildDebToArchive(commonPackage);
+        byte[] jqVersionReporterArchive = buildDeb.buildDebToArchive(jqVersionReporter);
+        byte[] jqVR2Archive = buildDeb.buildDebToArchive(jqVR2);
+
+        BuildIndex buildIndex = new BuildIndex();
+        var commonPackageIndex = buildIndex.buildDebIndexToDto(commonPackageArchive, commonPackage);
+        var jqVersionReporterIndex = buildIndex.buildDebIndexToDto(jqVersionReporterArchive, jqVersionReporter);
+        var jqVR2Index = buildIndex.buildDebIndexToDto(jqVR2Archive, jqVR2);
+
+        List<Map.Entry<DebPackageConfig, byte[]>> debFiles = List.of(
+                Map.entry(commonPackage, commonPackageArchive),
+                Map.entry(jqVersionReporter, jqVersionReporterArchive),
+                Map.entry(jqVR2, jqVR2Archive)
+        );
+
+        BuildRepository buildRepository = new BuildRepository();
+        var repo = buildRepository.repoBuilder(Instant.ofEpochMilli(1751384953000L))
+                .buildCodeName("bullseye").addIndex(commonPackageIndex).addIndex(jqVersionReporterIndex).addIndex(jqVR2Index).build()
+                .buildCodeName("bookworm").addIndex(commonPackageIndex).addIndex(jqVersionReporterIndex).addIndex(jqVR2Index).build()
+                .build();
+        var repoFiles = buildRepository.buildRepo(repo);
+
+        try (GenericContainer<?> genericContainer = new GenericContainer<>("debian:12-slim")) {
+            genericContainer
+                    .withCreateContainerCmdModifier(c -> c.withEntrypoint("tail", "-f", "/dev/null"));
+
+            // https://askubuntu.com/questions/170348/how-to-create-a-local-apt-repository
+            genericContainer.withCopyToContainer(Transferable.of("deb [trusted=yes] file:/tmp/repo bullseye main"), "/etc/apt/sources.list");
+
+            for (var repoFile : repoFiles.entrySet()) {
+                genericContainer.withCopyToContainer(Transferable.of(repoFile.getValue().getContent()), "/tmp/repo/dists/" + repoFile.getKey());
+            }
+            for (String codename : repo.getCodenameSectionMap().keySet()) {
+                for (var debFile : debFiles) {
+                    genericContainer.withCopyToContainer(Transferable.of(debFile.getValue()), "/tmp/repo/pool/" + codename + "/" + debFile.getKey().getMeta().getDebFilename());
+                }
+            }
+
+            genericContainer.start();
+            assertEquals(0, execInContainer(genericContainer, "rm", "-rf", "/etc/apt/sources.list.d").getExitCode());
+            assertEquals(0, execInContainer(genericContainer, "apt", "update").getExitCode());
+            assertEquals(0, execInContainer(genericContainer, "apt", "install", "-y", jqVersionReporter.getMeta().getName()).getExitCode());
+            assertEquals(0, execInContainer(genericContainer, "jqr").getExitCode());
+            assertThat(execInContainer(genericContainer, "jqr").getStdout(), containsString(jqVersionReporter.getMeta().getName()));
+
+            assertEquals(0, execInContainer(genericContainer, "apt", "install", "-y", jqVR2.getMeta().getName()).getExitCode());
+            assertEquals(0, execInContainer(genericContainer, "jqr").getExitCode());
+            assertThat(execInContainer(genericContainer, "jqr").getStdout(), containsString(jqVR2.getMeta().getName()));
+        }
+    }
+
+    @SneakyThrows
+    Container.ExecResult execInContainer(GenericContainer<?> container, String ...command) {
+        Container.ExecResult result = container.execInContainer(command);
+        log.info("running command {} gave {}, with stdout: {} and stderr: {}", command, result.getExitCode(), result.getStdout(), result.getStderr());
+        return result;
     }
 }
