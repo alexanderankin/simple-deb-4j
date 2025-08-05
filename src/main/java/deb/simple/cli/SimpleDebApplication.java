@@ -8,11 +8,13 @@ import deb.simple.gpg.GenerateGpgKey;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validation;
 import jakarta.validation.ValidatorFactory;
+import lombok.Data;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.pgpainless.key.generation.type.rsa.RsaLength;
 import picocli.AutoComplete;
 import picocli.CommandLine;
+import picocli.CommandLine.ArgGroup;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import software.amazon.awssdk.regions.Region;
@@ -23,6 +25,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 
 @Slf4j
 @Command(
@@ -83,50 +87,73 @@ public class SimpleDebApplication {
         }
     }
 
+    @SuppressWarnings("DefaultAnnotationParam")
+    @Data
     @Slf4j
     @Command(name = "repo", aliases = {"r"}, description = "build a debian repository")
-    static class BuildRepo {
-        @Command(name = "fs", description = "build a debian repository to/from local file system")
-        @SneakyThrows
-        public void run(
-                @Option(names = {"-i", "--input", "--input-dir", "--index-dir"}, description = "directory with index files (./$codename/**/*.deb)", required = true)
-                Path indexDir,
-                @Option(names = {"-o", "--output", "--output-dir"}, description = "output directory: 'dists' (for 'Release', 'main/binary-$arch/Packages')", required = true)
-                Path outDir,
-                @Option(names = {"-c", "--codename"}, description = "which codenames to process (or all, if none specified)")
-                List<String> codenames
-        ) {
-            run(codenames, new BuildRepositoryIO.FileBrIo(JsonMapper.builder().findAndAddModules().build(), indexDir, outDir));
+    static class BuildRepo implements Runnable {
+        @ArgGroup(multiplicity = "1")
+        InputGroup inputGroup;
+
+        @Option(names = {"-c", "--codename"}, description = "which codenames to process (or all, if none specified)")
+        List<String> codenames;
+
+        @ArgGroup(multiplicity = "1")
+        OutputGroup outputGroup;
+
+        @Option(names = {"-r", "--region", "--default-region"})
+        String region;
+
+        @SuppressWarnings("RedundantIfStatement")
+        boolean hasRegion() {
+            var i = inputGroup.getS3();
+            if (i != null)
+                if (null == Optional.ofNullable(i.getRegion()).orElse(region))
+                    return false;
+            var o = outputGroup.getS3();
+            if (o != null)
+                if (null == Optional.ofNullable(o.getRegion()).orElse(region))
+                    return false;
+            return true;
         }
 
-        @Command(name = "s3", description = "build a debian repository to/from s3")
-        public void s3(
-                @Option(names = {"-r", "--region"}, description = "aws bucket region (currently must be same for both)", required = true)
-                String region,
-                @Option(names = {"-i", "--s3-in-url"}, description = "input directory (for 'pool', 'dists', 'Release', 'main/binary-$arch/Packages')", required = true)
-                URI s3InUrl,
-                @Option(names = {"-o", "--s3-out-url"}, description = "output directory (for 'pool', 'dists', 'Release', 'main/binary-$arch/Packages')", required = true)
-                URI s3OutUrl,
-                @Option(names = {"-c", "--codename"}, description = "which codenames to process (or all, if none specified)")
-                List<String> codenames
-        ) {
+        public void run() {
+            if (!hasRegion())
+                throw new RuntimeException("Region not specified - need either default region or input/output -specific region");
+            log.info("{}", this);
+
+            var objectMapper = JsonMapper.builder().findAndAddModules().build();
             run(codenames,
-                    new BuildRepositoryIO.S3BrIo(
-                            S3Client.builder()
-                                    .region(Region.of(region))
-                                    .forcePathStyle(true)
-                                    .build(),
-                            JsonMapper.builder().findAndAddModules().build(),
-                            s3InUrl,
-                            s3OutUrl)
+                    inputGroup.getInput() == null
+                            // read from s3 pool
+                            ? s3InputIO(inputGroup.getS3().getUri(), inputGroup.getS3().getRegion(), objectMapper)
+                            // read from local filesystem pool
+                            : new BuildRepositoryIO.FileBrIo(objectMapper, inputGroup.getInput(), inputGroup.getInput()),
+                    outputGroup.getOutput() == null
+                            // write to s3 dist
+                            ? s3InputIO(outputGroup.getS3().getUri(), outputGroup.getS3().getRegion(), objectMapper)
+                            // write to local filesystem dist
+                            : new BuildRepositoryIO.FileBrIo(objectMapper, outputGroup.getOutput(), outputGroup.getOutput())
             );
         }
 
-        private void run(List<String> codenames, BuildRepositoryIO bio) {
+        BuildRepositoryIO.S3BrIo s3InputIO(URI uri, String groupRegion, JsonMapper objectMapper) {
+            return new BuildRepositoryIO.S3BrIo(
+                    S3Client.builder()
+                            .region(Region.of(Objects.requireNonNullElse(groupRegion, region)))
+                            .forcePathStyle(true)
+                            .build(),
+                    objectMapper,
+                    uri,
+                    uri
+            );
+        }
+
+        private void run(List<String> codenames, BuildRepositoryIO input, BuildRepositoryIO output) {
             var buildRepository = new BuildRepository();
             var repoBuilder = buildRepository.repoBuilder();
 
-            var builders = bio.readMetas();
+            var builders = input.readMetas();
             List<String> codeNamesFiltered = determineCodenames(codenames, new ArrayList<>(builders.keySet()));
             for (String codename : codeNamesFiltered) {
                 var builder = repoBuilder.buildCodeName(codename);
@@ -136,7 +163,7 @@ public class SimpleDebApplication {
 
             var repo = repoBuilder.build();
             var files = buildRepository.buildRepo(repo);
-            bio.writeFiles(files);
+            output.writeFiles(files);
         }
 
         private List<String> determineCodenames(List<String> codenames, List<String> codeNamesFound) {
@@ -152,6 +179,38 @@ public class SimpleDebApplication {
                 return codeNamesFound;
             } else {
                 return codeNamesFound.stream().filter(codenames::contains).toList();
+            }
+        }
+
+        @Data
+        static class InputGroup {
+            @Option(names = {"-i", "--input", "--input-dir"})
+            Path input;
+            @ArgGroup(exclusive = false)
+            S3InputGroup s3;
+
+            @Data
+            static class S3InputGroup {
+                @Option(names = {"-s3i", "--s3-input"})
+                URI uri;
+                @Option(names = {"-ri", "--s3-input-region"}, required = false)
+                String region;
+            }
+        }
+
+        @Data
+        static class OutputGroup {
+            @Option(names = {"-o", "--output", "--output-dir"})
+            Path output;
+            @ArgGroup(exclusive = false)
+            S3OutputGroup s3;
+
+            @Data
+            static class S3OutputGroup {
+                @Option(names = {"-s3o", "--s3-output"})
+                URI uri;
+                @Option(names = {"-ro", "--s3-output-region"}, required = false)
+                String region;
             }
         }
     }
