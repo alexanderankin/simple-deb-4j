@@ -16,6 +16,14 @@ import java.util.stream.Collectors;
 public enum DebArch {
     amd64("amd64"),
     arm64("aarch64"),
+    /**
+     * <code>sudo apt install qemu-system-arm</code>
+     */
+    armhf("arm"),
+    /**
+     * <code>sudo apt install qemu-system-misc</code>
+     */
+    riscv64("riscv64"),
     ;
 
     private static final Map<String, DebArch> MAP = Arrays.stream(values())

@@ -1,5 +1,6 @@
 package deb.simple.build_deb;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 import lombok.experimental.Accessors;
 import org.apache.commons.codec.digest.DigestUtils;
@@ -9,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 @Data
 @Accessors(chain = true)
 public class FileIntegrity {
+    @JsonIgnore
     byte[] content;
     String path;
     int size;

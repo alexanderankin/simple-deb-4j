@@ -3,7 +3,6 @@ package deb.simple.build_deb;
 import deb.simple.DebArch;
 import lombok.extern.slf4j.Slf4j;
 
-import java.nio.charset.StandardCharsets;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
@@ -37,7 +36,7 @@ public class BuildRelease {
                 hashSection("SHA512Sum", FileIntegrity::getSha512, packagesFiles) + "\n";
 
         log.debug("created release: {}", release);
-        headerIntegrity.setContent(release.getBytes(StandardCharsets.UTF_8));
+        packagesFiles.put("Release", FileIntegrity.of(release, "Release"));
         return release;
     }
 

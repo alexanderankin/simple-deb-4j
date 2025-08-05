@@ -2,6 +2,7 @@ package deb.simple.build_deb;
 
 import deb.simple.DebArch;
 import lombok.Data;
+import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.experimental.Accessors;
@@ -46,7 +47,10 @@ public class BuildRepository {
      */
     public Map<String, FileIntegrity> buildRepo(Repo repo) {
         return repo.codenameSectionMap().entrySet().stream()
-                .flatMap(e -> e.getValue().packagesFiles().entrySet().stream().map(ee -> Map.entry(e.getValue().getCodename() + "/" + ee.getKey(), ee.getValue())))
+                .flatMap(e ->
+                        e.getValue().packagesFiles().entrySet().stream()
+                                .map(ee ->
+                                        Map.entry(e.getValue().getCodename() + "/" + ee.getKey(), ee.getValue())))
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 
@@ -122,7 +126,9 @@ public class BuildRepository {
 
         @RequiredArgsConstructor
         public static class CodenameSectionBuilder {
+            @NonNull
             final RepoBuilder repoBuilder;
+            @NonNull
             final Repo.CodenameSection codenameSection;
             final List<DebPackageMeta> debPackageMetaList = new ArrayList<>();
 
@@ -134,7 +140,10 @@ public class BuildRepository {
                 for (String component : codenameSection.components()) {
                     for (DebArch arch : codenameSection.arches()) {
                         var packagesFile = component + "/binary-" + arch + "/Packages";
-                        var content = bpi.buildPackagesIndex(debPackageMetaList);
+                        var packagesListForArch = debPackageMetaList.stream()
+                                .filter(m -> m.getDebPackageConfig().getMeta().getArch() == arch)
+                                .toList();
+                        var content = bpi.buildPackagesIndex(packagesListForArch);
                         var integrity = FileIntegrity.of(content, packagesFile);
                         packagesFiles.put(packagesFile, integrity);
 

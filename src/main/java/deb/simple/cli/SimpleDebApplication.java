@@ -1,10 +1,8 @@
 package deb.simple.cli;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
-import deb.simple.DebArch;
 import deb.simple.build_deb.*;
 import deb.simple.gpg.GenerateGpgKey;
 import jakarta.validation.ConstraintViolationException;
@@ -12,26 +10,19 @@ import jakarta.validation.Validation;
 import jakarta.validation.ValidatorFactory;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
-import org.apache.commons.compress.compressors.gzip.GzipUtils;
-import org.apache.commons.io.input.TeeInputStream;
-import org.bouncycastle.util.io.TeeOutputStream;
 import org.pgpainless.key.generation.type.rsa.RsaLength;
 import picocli.AutoComplete;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3Client;
 
-import java.io.ByteArrayOutputStream;
-import java.io.FileOutputStream;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Instant;
-import java.util.*;
-
-import static deb.simple.build_deb.DebPackageConfig.PackageMeta.SD_INDEX_EXTENSION;
+import java.util.ArrayList;
+import java.util.List;
 
 @Slf4j
 @Command(
@@ -52,7 +43,7 @@ import static deb.simple.build_deb.DebPackageConfig.PackageMeta.SD_INDEX_EXTENSI
 public class SimpleDebApplication {
 
     public static void main(String[] args) {
-        args = new String[]{"b", "-c", "/home/toor/IdeaProjects/simple-deb-4j/src/test/resources/deb/simple/build_deb/simple.yaml", "-o", "/tmp/tmp.MTtdYc3eNo", "-i"};
+        // args = new String[]{"r", "-i", "/tmp/ubuntu/pool", "-o", "/tmp/tmp.0cXfw8d3QV"};
         int exitCode = new CommandLine(SimpleDebApplication.class).execute(args);
         System.exit(exitCode);
     }
@@ -94,89 +85,74 @@ public class SimpleDebApplication {
 
     @Slf4j
     @Command(name = "repo", aliases = {"r"}, description = "build a debian repository")
-    static class BuildRepo implements Runnable {
-        ObjectMapper o = new ObjectMapper().findAndRegisterModules();
-
-        @Option(names = {"-i", "--input", "--input-dir", "--index-dir"}, description = "directory with index files (./$codename/**/*.deb")
-        Path indexDir;
-
-        @Option(names = {"-o", "--output", "--output-dir"}, description = "output directory: 'dists' (for 'Release', 'main/binary-$arch/Packages')")
-        Path outDir;
-
-        @Option(names = {"-c", "--codename"}, description = "which codenames to process (or all, if none specified)")
-        List<String> codenames;
-
+    static class BuildRepo {
+        @Command(name = "fs", description = "build a debian repository to/from local file system")
         @SneakyThrows
-        @Override
-        public void run() {
+        public void run(
+                @Option(names = {"-i", "--input", "--input-dir", "--index-dir"}, description = "directory with index files (./$codename/**/*.deb)", required = true)
+                Path indexDir,
+                @Option(names = {"-o", "--output", "--output-dir"}, description = "output directory: 'dists' (for 'Release', 'main/binary-$arch/Packages')", required = true)
+                Path outDir,
+                @Option(names = {"-c", "--codename"}, description = "which codenames to process (or all, if none specified)")
+                List<String> codenames
+        ) {
+            run(codenames, new BuildRepositoryIO.FileBrIo(JsonMapper.builder().findAndAddModules().build(), indexDir, outDir));
+        }
+
+        @Command(name = "s3", description = "build a debian repository to/from s3")
+        public void s3(
+                @Option(names = {"-r", "--region"}, description = "aws bucket region (currently must be same for both)", required = true)
+                String region,
+                @Option(names = {"-i", "--s3-in-url"}, description = "input directory (for 'pool', 'dists', 'Release', 'main/binary-$arch/Packages')", required = true)
+                URI s3InUrl,
+                @Option(names = {"-o", "--s3-out-url"}, description = "output directory (for 'pool', 'dists', 'Release', 'main/binary-$arch/Packages')", required = true)
+                URI s3OutUrl,
+                @Option(names = {"-c", "--codename"}, description = "which codenames to process (or all, if none specified)")
+                List<String> codenames
+        ) {
+            run(codenames,
+                    new BuildRepositoryIO.S3BrIo(
+                            S3Client.builder()
+                                    .region(Region.of(region))
+                                    .forcePathStyle(true)
+                                    .build(),
+                            JsonMapper.builder().findAndAddModules().build(),
+                            s3InUrl,
+                            s3OutUrl)
+            );
+        }
+
+        private void run(List<String> codenames, BuildRepositoryIO bio) {
             var buildRepository = new BuildRepository();
             var repoBuilder = buildRepository.repoBuilder();
 
-            List<String> codeNamesFiltered = determineCodenames();
+            var builders = bio.readMetas();
+            List<String> codeNamesFiltered = determineCodenames(codenames, new ArrayList<>(builders.keySet()));
             for (String codename : codeNamesFiltered) {
                 var builder = repoBuilder.buildCodeName(codename);
-                try (var files = Files.walk(indexDir.resolve(codename))) {
-                    files
-                            .filter(file -> file.getFileName().toString().endsWith(SD_INDEX_EXTENSION))
-                            .map(this::readValue)
-                            .forEach(builder::addIndex);
-                }
+                builders.getOrDefault(codename, List.of()).forEach(builder::addIndex);
                 builder.build();
             }
 
             var repo = repoBuilder.build();
             var files = buildRepository.buildRepo(repo);
-            for (var fileEntry : files.entrySet()) {
-                log.info("writing file {} relative to dir {}", fileEntry.getKey(), outDir);
-                Files.write(outDir.resolve(fileEntry.getKey()), fileEntry.getValue().getContent());
-            }
+            bio.writeFiles(files);
         }
 
-        private List<String> determineCodenames() {
-            List<String> codeNamesFound = readCodeNames();
-            List<String> codeNamesFiltered = filterCodeNames(codeNamesFound);
-            log.info("using codename list: {} in directory {} based on filter list: {}", codeNamesFiltered, indexDir, codenames);
+        private List<String> determineCodenames(List<String> codenames, List<String> codeNamesFound) {
+            List<String> codeNamesFiltered = filterCodeNames(codenames, codeNamesFound);
+            log.info("using codename list: {} based on filter list: {}", codeNamesFiltered, codenames);
             if (codenames != null && codeNamesFound.size() != codenames.size())
                 log.warn("codenames were specified and filtered down to {} from {}", codeNamesFiltered, codeNamesFound);
             return codeNamesFiltered;
         }
 
-        private List<String> readCodeNames() {
-            return Arrays.stream(Objects.requireNonNull(
-                            indexDir.toFile().list(),
-                            () -> "directory " + indexDir + " has no contents"
-                    ))
-                    .sorted()
-                    .toList();
-        }
-
-        private List<String> filterCodeNames(List<String> codeNamesFound) {
+        private List<String> filterCodeNames(List<String> codenames, List<String> codeNamesFound) {
             if (codenames == null || codenames.isEmpty()) {
                 return codeNamesFound;
             } else {
                 return codeNamesFound.stream().filter(codenames::contains).toList();
             }
-        }
-
-        @SneakyThrows
-        DebPackageMeta readValue(Path i) {
-            return o.readValue(i.toFile(), DebPackageMeta.class);
-        }
-
-        @Command(name = "s3", description = "build a debian repository to/from s3")
-        public void s3(
-                @Option(names = {"--s3-url"}, description = "input/output directory (for 'pool', 'dists', 'Release', 'main/binary-$arch/Packages')")
-                URI s3Url
-        ) {
-        }
-
-        @Command(name = "s3-repo", description = "build a debian repository to/from s3")
-        public void s3Repo(
-                @Option(names = {"-i", "--index-dir"}, description = "directory with index files ('pool')")
-                Path indexDir,
-                @Option(names = {"--s3-url"}, description = "output directory (for 'dists', 'Release', 'main/binary-$arch/Packages')")
-                URI s3Url
-        ) {
         }
     }
 
