@@ -19,6 +19,10 @@ jar.manifest.attributes(['Implementation-Version': version])
 configurations {
     testAnnotationProcessor.extendsFrom annotationProcessor
     testCompileOnly.extendsFrom compileOnly
+
+    implementation {
+        exclude group: 'commons-logging', module: 'commons-logging'
+    }
 }
 
 dependencies {
