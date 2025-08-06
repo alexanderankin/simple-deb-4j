@@ -30,7 +30,7 @@
         },
         "arch": {
           "type": "string",
-          "enum": ["amd64", "aarch64"],
+          "enum": ["amd64", "arm64", "armhf", "riscv64"],
           "description": "Should match architectures from `dpkg-architecture`"
         }
       }

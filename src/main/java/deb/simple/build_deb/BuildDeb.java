@@ -28,30 +28,19 @@ public class BuildDeb {
     Path current = Path.of(System.getProperty("user.dir"));
 
     @SneakyThrows
-    public void buildDeb(DebPackageConfig config, Path outDir) {
-        buildDeb(config, outDir, false);
-    }
-
-    @SneakyThrows
-    public void buildDeb(DebPackageConfig config, Path outDir, boolean skipData) {
-        byte[] arArchive = buildDebToArchive(config, skipData);
+    public byte[] buildDeb(DebPackageConfig config, Path outDir) {
+        byte[] arArchive = buildDebToArchive(config);
 
         String debFilename = config.getMeta().getDebFilename();
-        if (skipData) {
-            debFilename += ".simple-deb-4j-index";
-        }
         Path output = outDir.resolve(debFilename);
         Files.createDirectories(outDir);
         Files.write(output, arArchive);
 
         log.info("Created .deb package: {}", output);
+        return arArchive;
     }
 
     public byte[] buildDebToArchive(DebPackageConfig config) {
-        return buildDebToArchive(config, false);
-    }
-
-    public byte[] buildDebToArchive(DebPackageConfig config, boolean skipData) {
         byte[] controlTarGz = createTarGz(
                 Optional.ofNullable(config.getFiles().getControlFiles()).orElseGet(List::of),
                 List.of(new DebPackageConfig.TarFileSpec.TextTarFileSpec()
@@ -61,7 +50,7 @@ public class BuildDeb {
         );
 
         byte[] dataTarGz = createTarGz(
-                skipData ? List.of() : Optional.ofNullable(config.getFiles().getDataFiles()).orElseGet(List::of),
+                Optional.ofNullable(config.getFiles().getDataFiles()).orElseGet(List::of),
                 List.of()
         );
 

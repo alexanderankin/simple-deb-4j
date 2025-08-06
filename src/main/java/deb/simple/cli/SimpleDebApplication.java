@@ -3,22 +3,30 @@ package deb.simple.cli;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
-import deb.simple.build_deb.BuildDeb;
-import deb.simple.build_deb.DebPackageConfig;
+import deb.simple.build_deb.*;
 import deb.simple.gpg.GenerateGpgKey;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validation;
 import jakarta.validation.ValidatorFactory;
+import lombok.Data;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.pgpainless.key.generation.type.rsa.RsaLength;
 import picocli.AutoComplete;
 import picocli.CommandLine;
+import picocli.CommandLine.ArgGroup;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.S3ClientBuilder;
 
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Command(
@@ -31,6 +39,7 @@ import java.nio.file.Path;
         scope = CommandLine.ScopeType.INHERIT,
         subcommands = {
                 SimpleDebApplication.Build.class,
+                SimpleDebApplication.BuildRepo.class,
                 SimpleDebApplication.Gpg.class,
                 AutoComplete.GenerateCompletion.class,
         }
@@ -38,6 +47,7 @@ import java.nio.file.Path;
 public class SimpleDebApplication {
 
     public static void main(String[] args) {
+        // args = new String[]{"r", "-i", "/tmp/ubuntu/pool", "-o", "/tmp/tmp.0cXfw8d3QV"};
         int exitCode = new CommandLine(SimpleDebApplication.class).execute(args);
         System.exit(exitCode);
     }
@@ -50,7 +60,7 @@ public class SimpleDebApplication {
         Path outDir;
         @Option(names = {"-i", "--index"}, description = "produce index package - suitable for indexing but not installable")
         boolean index = false;
-        @Option(names = {"-C"}, description = "change directory before running", defaultValue = "$PWD")
+        @Option(names = {"-C"}, description = "change directory before running (defaults to $PWD)")
         Path current = Path.of(System.getProperty("user.dir"));
 
         @SneakyThrows
@@ -68,11 +78,198 @@ public class SimpleDebApplication {
                 var errors = validatorFactory.getValidator().validate(config);
                 if (!errors.isEmpty())
                     throw new ConstraintViolationException(errors);
-                new BuildDeb()
-                        .setCurrent(current)
-                        .buildDeb(config, outDir, index);
+            }
+            var deb = new BuildDeb()
+                    .setCurrent(current)
+                    .buildDeb(config, outDir);
+            if (index)
+                new BuildIndex().buildDebIndex(deb, config, outDir);
+        }
+    }
+
+    @SuppressWarnings("DefaultAnnotationParam")
+    @Data
+    @Slf4j
+    @Command(name = "repo", aliases = {"r"}, description = "build a debian repository")
+    static class BuildRepo implements Runnable {
+        @ArgGroup(multiplicity = "1")
+        InputGroup inputGroup;
+
+        @Option(names = {"-c", "--codename"}, description = "which codenames to process (or all, if none specified)")
+        List<String> codenames;
+
+        @ArgGroup(multiplicity = "1")
+        OutputGroup outputGroup;
+
+        /*
+        @ArgGroup
+        SigningGroup signingGroup;
+        */
+
+        @Option(names = {"-r", "--region", "--default-region"})
+        String region;
+
+        public void run() {
+            log.info("{}", this);
+
+            var objectMapper = JsonMapper.builder().findAndAddModules().build();
+            run(codenames,
+                    inputGroup.getInput() == null
+                            // read from s3 pool
+                            ? s3InputIO(inputGroup.getS3().getUri(), inputGroup.getS3().getRegion(), objectMapper)
+                            // read from local filesystem pool
+                            : new BuildRepositoryIO.FileBrIo(objectMapper, inputGroup.getInput(), inputGroup.getInput()),
+                    outputGroup.getOutput() == null
+                            // write to s3 dist
+                            ? s3InputIO(outputGroup.getS3().getUri(), outputGroup.getS3().getRegion(), objectMapper)
+                            // write to local filesystem dist
+                            : new BuildRepositoryIO.FileBrIo(objectMapper, outputGroup.getOutput(), outputGroup.getOutput())
+            );
+        }
+
+        BuildRepositoryIO.S3BrIo s3InputIO(URI uri, String groupRegion, JsonMapper objectMapper) {
+            S3ClientBuilder builder = S3Client.builder();
+            Optional.ofNullable(groupRegion)
+                    .or(() -> Optional.ofNullable(region))
+                    .map(Region::of)
+                    .map(builder::region);
+            return new BuildRepositoryIO.S3BrIo(
+                    builder
+                            .forcePathStyle(true)
+                            .build(),
+                    objectMapper,
+                    uri,
+                    uri
+            );
+        }
+
+        @SneakyThrows
+        private void run(List<String> codenames, BuildRepositoryIO input, BuildRepositoryIO output) {
+            var buildRepository = new BuildRepository();
+            var repoBuilder = buildRepository.repoBuilder();
+
+            var builders = input.readMetas();
+            List<String> codeNamesFiltered = determineCodenames(codenames, new ArrayList<>(builders.keySet()));
+            for (String codename : codeNamesFiltered) {
+                var builder = repoBuilder.buildCodeName(codename);
+                builders.getOrDefault(codename, List.of()).forEach(builder::addIndex);
+                builder.build();
+            }
+
+            var repo = repoBuilder.build();
+            var files = buildRepository.buildRepo(repo);
+            // this doesn't work, and it's not even close
+            /*
+            if (signingGroup != null) {
+                String signingKey;
+                String signingPubKey;
+                SigningGroup.AwsGroup param = signingGroup.getParam();
+                if (param != null) {
+                    SsmClientBuilder builder = SsmClient.builder();
+
+                    Optional.ofNullable(param.getRegion())
+                            .or(() -> Optional.ofNullable(region))
+                            .map(Region::of)
+                            .ifPresent(builder::region);
+
+                    try (var ssmClient = builder.build()) {
+                        signingKey = ssmClient.getParameter(GetParameterRequest.builder()
+                                        .name(param.getParamName())
+                                        .withDecryption(true)
+                                        .build())
+                                .parameter().value();
+                        signingPubKey = ssmClient.getParameter(GetParameterRequest.builder()
+                                        .name(param.getParamPubName())
+                                        .withDecryption(true)
+                                        .build())
+                                .parameter().value();
+                    }
+                } else {
+                    signingKey = Files.readString(signingGroup.getFsGroup().getPrivKey(), StandardCharsets.UTF_8);
+                    signingPubKey = Files.readString(signingGroup.getFsGroup().getPubKey(), StandardCharsets.UTF_8);
+                }
+
+                buildRepository.signFiles(files, signingKey, signingPubKey);
+            }
+            */
+            output.writeFiles(files);
+        }
+
+        private List<String> determineCodenames(List<String> codenames, List<String> codeNamesFound) {
+            List<String> codeNamesFiltered = filterCodeNames(codenames, codeNamesFound);
+            log.info("using codename list: {} based on filter list: {}", codeNamesFiltered, codenames);
+            if (codenames != null && codeNamesFound.size() != codenames.size())
+                log.warn("codenames were specified and filtered down to {} from {}", codeNamesFiltered, codeNamesFound);
+            return codeNamesFiltered;
+        }
+
+        private List<String> filterCodeNames(List<String> codenames, List<String> codeNamesFound) {
+            if (codenames == null || codenames.isEmpty()) {
+                return codeNamesFound;
+            } else {
+                return codeNamesFound.stream().filter(codenames::contains).toList();
             }
         }
+
+        @Data
+        static class InputGroup {
+            @Option(names = {"-i", "--input", "--input-dir"})
+            Path input;
+            @ArgGroup(exclusive = false)
+            S3InputGroup s3;
+
+            @Data
+            static class S3InputGroup {
+                @Option(names = {"-s3i", "--s3-input"})
+                URI uri;
+                @Option(names = {"-ri", "--s3-input-region"}, required = false)
+                String region;
+            }
+        }
+
+        @Data
+        static class OutputGroup {
+            @Option(names = {"-o", "--output", "--output-dir"})
+            Path output;
+            @ArgGroup(exclusive = false)
+            S3OutputGroup s3;
+
+            @Data
+            static class S3OutputGroup {
+                @Option(names = {"-s3o", "--s3-output"})
+                URI uri;
+                @Option(names = {"-ro", "--s3-output-region"}, required = false)
+                String region;
+            }
+        }
+
+        /*
+        @Data
+        static class SigningGroup {
+            @ArgGroup(exclusive = false)
+            FsGroup fsGroup;
+            @ArgGroup(exclusive = false)
+            AwsGroup param;
+
+            @Data
+            static class FsGroup {
+                @Option(names = {"--signing-key"})
+                Path privKey;
+                @Option(names = {"--signing-public-key"})
+                Path pubKey;
+            }
+
+            @Data
+            static class AwsGroup {
+                @Option(names = {"--signing-key-parameter"})
+                String paramName;
+                @Option(names = {"--signing-public-key-parameter"})
+                String paramPubName;
+                @Option(names = {"-skpr", "--signing-key-parameter-region"}, required = false)
+                String region;
+            }
+        }
+        */
     }
 
     @Command(name = "gpg", aliases = {"g"}, description = "gpg functions", subcommands = {

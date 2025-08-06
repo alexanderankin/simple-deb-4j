@@ -3,6 +3,7 @@ plugins {
     id 'application'
     id 'com.google.cloud.tools.jib' version '3.4.5'
     id 'com.gradleup.shadow' version '9.0.0-beta11'
+    id 'jacoco'
 }
 
 repositories {
@@ -23,6 +24,7 @@ configurations {
 dependencies {
     implementation platform('org.springframework.boot:spring-boot-dependencies:3.4.4')
     annotationProcessor platform('org.springframework.boot:spring-boot-dependencies:3.4.4')
+    implementation platform('io.awspring.cloud:spring-cloud-aws-dependencies:3.4.0')
 
     annotationProcessor 'org.projectlombok:lombok'
     compileOnly 'org.projectlombok:lombok'
@@ -31,7 +33,10 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-json'
     implementation 'org.springframework.boot:spring-boot-starter-logging'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
+    // implementation 'io.awspring.cloud:spring-cloud-aws-starter-s3'
     implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml'
+    implementation 'software.amazon.awssdk:s3'
+    implementation 'software.amazon.awssdk:ssm'
 
     implementation 'info.picocli:picocli:4.7.6'
     implementation 'org.apache.commons:commons-compress:1.27.1'

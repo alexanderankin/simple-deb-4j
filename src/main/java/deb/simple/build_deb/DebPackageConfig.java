@@ -1,8 +1,6 @@
 package deb.simple.build_deb;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonSubTypes;
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.annotation.*;
 import deb.simple.DebArch;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -12,20 +10,23 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 import lombok.experimental.Accessors;
+import org.apache.commons.lang3.StringUtils;
 
 import java.net.URI;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 @Data
 @Accessors(chain = true)
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class DebPackageConfig {
+    @NotNull
     @Valid
     PackageMeta meta;
+    @NotNull
     @Valid
     ControlExtras control;
+    @NotNull
     @Valid
     DebFileSpec files;
 
@@ -89,6 +90,7 @@ public class DebPackageConfig {
     @Accessors(chain = true)
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class PackageMeta {
+        public static final String SD_INDEX_EXTENSION = ".simple-deb-4j-index.json";
         @NotBlank
         String name;
         @NotBlank
@@ -96,8 +98,14 @@ public class DebPackageConfig {
         @NotNull
         DebArch arch;
 
+        @JsonIgnore
         public String getDebFilename() {
             return name + "_" + version + "_" + arch + ".deb";
+        }
+
+        @JsonIgnore
+        public String getIndexFilename() {
+            return name + "_" + version + "_" + arch + SD_INDEX_EXTENSION;
         }
     }
 
@@ -106,21 +114,39 @@ public class DebPackageConfig {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class ControlExtras {
         @NotNull
+        @JsonAlias("Depends")
         String depends = "";
         @NotNull
+        @JsonAlias("Recommends")
         String recommends = "";
-        @NotNull
+        @NotBlank
+        @JsonAlias("Section")
         String section = "main";
-        @NotNull
+        @NotBlank
+        @JsonAlias("Priority")
         String priority = "optional";
         @NotNull
+        @JsonAlias("Homepage")
         String homepage = "";
         @NotNull
+        @JsonAlias("Conflicts")
         String conflicts = "";
         @NotBlank
+        @JsonAlias("Maintainer")
         String maintainer = "";
         @NotBlank
+        @JsonAlias("Description")
         String description = "";
+
+        public ControlExtras setSection(String section) {
+            this.section = StringUtils.isBlank(section) ? "main" : section;
+            return this;
+        }
+
+        public ControlExtras setPriority(String priority) {
+            this.priority = StringUtils.isBlank(priority) ? "optional" : priority;
+            return this;
+        }
 
         public String render(PackageMeta meta) {
             return String.format("""
