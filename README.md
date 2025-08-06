@@ -4,7 +4,7 @@ This project provides a library and command line tool for performing the debian 
 
 ## changes
 
-* version 0.0.8
+* version 0.0.8 - `Wed, 06 Aug 2025 07:19:12 -0400`
   * exclude commons logging to silence warning
   * include origin and label on Release
   * actually calculate installed size
