@@ -74,15 +74,15 @@ class BuildRepositoryTest {
                          e03ad37ef03cbaa936bf4116fc627974              126 Release
                          301672485cd2b2c5f256d6b7fc00a4c5              481 main/binary-amd64/Packages
                          71d83cc9c9ab98e7e88bf80936a579d1              351 main/binary-amd64/Packages.gz
-                        SHA1Sum:
+                        SHA1:
                          5b3bc1755d4d7e170002300370d727e7af7e6c1a              126 Release
                          743bace56e8c1701e48d2fd63fb8c18f48b669b4              481 main/binary-amd64/Packages
                          336aade40841d34777f8bb6fc430005c845e887d              351 main/binary-amd64/Packages.gz
-                        SHA256Sum:
+                        SHA256:
                          fdaa9ea78dd813665234f1eb1f6a31677ba6eb2a99c44c8fc7ae3eb7a682d209              126 Release
                          246bef0188a8e60855cab8206376c7989b494dcd27d1e91275006a99bd45c339              481 main/binary-amd64/Packages
                          7b196b75a13b6d34b57cf9203e8927ed112333c37c273217746d615f9a7463f7              351 main/binary-amd64/Packages.gz
-                        SHA512Sum:
+                        SHA512:
                          0a7ec56ab72e5bc19e65719f73b428ffb361aa9dcf5b73e31416cc3502b2d2b07c0f0166b58d826522892520b744d30fc72f3d4580b9e054f91d625b86a43452              126 Release
                          fa5e46b9949739a155369e26939b5d9e562dd70b81f104391e661e81b78ac1621d25f5db75688af70ee840e7c78560fdabd5acf3fe6067f318744a89b25429dc              481 main/binary-amd64/Packages
                          7bdd10b20d55cb4e9ea9aa83f9942aa13c052026d03e040647f543642421adc897d7c3cb54e46a226116aa7774cd25fbe5ae97ae81a68d43853fb55ec4715735              351 main/binary-amd64/Packages.gz
