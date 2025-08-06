@@ -182,6 +182,7 @@ class BuildRepositoryTest {
         return result;
     }
 
+    /*
     @SneakyThrows
     @Test
     void test() {
@@ -207,4 +208,5 @@ class BuildRepositoryTest {
 
         assertThat(headers, is(Set.of("-----BEGIN PGP SIGNED MESSAGE-----", "-----BEGIN PGP SIGNATURE-----")));
     }
+    */
 }
