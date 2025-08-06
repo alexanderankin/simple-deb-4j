@@ -36,6 +36,7 @@ dependencies {
     // implementation 'io.awspring.cloud:spring-cloud-aws-starter-s3'
     implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml'
     implementation 'software.amazon.awssdk:s3'
+    implementation 'software.amazon.awssdk:ssm'
 
     implementation 'info.picocli:picocli:4.7.6'
     implementation 'org.apache.commons:commons-compress:1.27.1'

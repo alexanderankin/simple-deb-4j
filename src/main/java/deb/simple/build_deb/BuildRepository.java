@@ -54,6 +54,83 @@ public class BuildRepository {
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 
+    // <T> Stream<T> streamFromIterator(Iterator<T> i) {
+    //     return StreamSupport.stream(Spliterators.spliteratorUnknownSize(i, 0), false);
+    // }
+    //
+    // @SneakyThrows
+    // public void signFiles(Map<String, FileIntegrity> files, String signingKey, String signingPublicKey) {
+    //     var releaseFiles = files.entrySet().stream()
+    //             .filter(e -> e.getKey().endsWith("Release"))
+    //             .toList();
+    //
+    //     // PGPSecretKeyRing secretKey = PGPainless.readKeyRing().secretKeyRing(signingKey);
+    //     // if (secretKey == null) {
+    //     //     throw new RuntimeException("No secret key found for signing");
+    //     // }
+    //     //
+    //     // SecretKeyRingProtector protector = SecretKeyRingProtector.unprotectedKeys();
+    //     //
+    //     // // Get the first user ID (email) from the secret key
+    //     // String userId = streamFromIterator(secretKey.getSecretKeys())
+    //     //         .flatMap(k -> streamFromIterator(k.getUserIDs()))
+    //     //         .findFirst()
+    //     //         .orElseThrow(() -> new RuntimeException("No user ID (email) found in secret key"));
+    //
+    //     for (Map.Entry<String, FileIntegrity> releaseFile : releaseFiles) {
+    //         String releasePath = releaseFile.getKey();
+    //         String releasePathPrefix = releasePath.substring(0, releasePath.length() - "Release".length());
+    //
+    //         // 1. Detached ASCII-armored signature: Release.gpg
+    //         String sigPath = releasePath + ".gpg";
+    //
+    //         // try (ByteArrayOutputStream out = new ByteArrayOutputStream();
+    //         //      OutputStream armored = new ArmoredOutputStream(out)) {
+    //         //
+    //         //     SigningOptions options = SigningOptions.get()
+    //         //             .addDetachedSignature(protector, secretKey, userId);
+    //         //
+    //         //     try (OutputStream signer = PGPainless.encryptAndOrSign()
+    //         //             .onOutputStream(armored)
+    //         //             .withOptions(ProducerOptions.sign(options)
+    //         //                     .setCleartextSigned())) {
+    //         //
+    //         //         new ByteArrayInputStream(releaseFile.getValue().getContent())
+    //         //                 .transferTo(signer);
+    //         //     }
+    //         //
+    //         //     System.out.println(out.toString(StandardCharsets.UTF_8));
+    //         //     files.put(sigPath, FileIntegrity.of(out.toByteArray(), sigPath));
+    //         // }
+    //
+    //
+    //         // 2. Clear-signed file: InRelease
+    //         String inReleasePath = releasePathPrefix + "InRelease";
+    //
+    //         // try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+    //         //     SigningOptions options = SigningOptions.get()
+    //         //             .addInlineSignature(protector, secretKey, userId);
+    //         //
+    //         //     try (OutputStream signer = PGPainless.encryptAndOrSign()
+    //         //             .onOutputStream(out)
+    //         //             .withOptions(ProducerOptions.sign(options))) {
+    //         //
+    //         //         new ByteArrayInputStream(releaseFile.getValue().getContent())
+    //         //                 .transferTo(signer);
+    //         //     }
+    //         //
+    //         //     files.put(inReleasePath, FileIntegrity.of(out.toByteArray(), inReleasePath));
+    //         // }
+    //
+    //         var signed = BuildRepositoryGpgSignatures.signReleaseFile(signingKey, signingPublicKey, releaseFile.getValue().getContent());
+    //         files.put(sigPath, FileIntegrity.of(signed.get("Release.gpg"), sigPath));
+    //         files.put(inReleasePath, FileIntegrity.of(signed.get("InRelease"), inReleasePath));
+    //
+    //         String repositoryGpgPath = releasePathPrefix + "repository.gpg";
+    //         files.put(repositoryGpgPath, FileIntegrity.of(signed.get("repository.gpg"), repositoryGpgPath));
+    //     }
+    // }
+
     @Data
     @Accessors(chain = true)
     public static class Repo {

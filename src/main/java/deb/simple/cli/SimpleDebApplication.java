@@ -19,13 +19,13 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.S3ClientBuilder;
 
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 
 @Slf4j
@@ -101,25 +101,15 @@ public class SimpleDebApplication {
         @ArgGroup(multiplicity = "1")
         OutputGroup outputGroup;
 
+        /*
+        @ArgGroup
+        SigningGroup signingGroup;
+        */
+
         @Option(names = {"-r", "--region", "--default-region"})
         String region;
 
-        @SuppressWarnings("RedundantIfStatement")
-        boolean hasRegion() {
-            var i = inputGroup.getS3();
-            if (i != null)
-                if (null == Optional.ofNullable(i.getRegion()).orElse(region))
-                    return false;
-            var o = outputGroup.getS3();
-            if (o != null)
-                if (null == Optional.ofNullable(o.getRegion()).orElse(region))
-                    return false;
-            return true;
-        }
-
         public void run() {
-            if (!hasRegion())
-                throw new RuntimeException("Region not specified - need either default region or input/output -specific region");
             log.info("{}", this);
 
             var objectMapper = JsonMapper.builder().findAndAddModules().build();
@@ -138,9 +128,13 @@ public class SimpleDebApplication {
         }
 
         BuildRepositoryIO.S3BrIo s3InputIO(URI uri, String groupRegion, JsonMapper objectMapper) {
+            S3ClientBuilder builder = S3Client.builder();
+            Optional.ofNullable(groupRegion)
+                    .or(() -> Optional.ofNullable(region))
+                    .map(Region::of)
+                    .map(builder::region);
             return new BuildRepositoryIO.S3BrIo(
-                    S3Client.builder()
-                            .region(Region.of(Objects.requireNonNullElse(groupRegion, region)))
+                    builder
                             .forcePathStyle(true)
                             .build(),
                     objectMapper,
@@ -149,6 +143,7 @@ public class SimpleDebApplication {
             );
         }
 
+        @SneakyThrows
         private void run(List<String> codenames, BuildRepositoryIO input, BuildRepositoryIO output) {
             var buildRepository = new BuildRepository();
             var repoBuilder = buildRepository.repoBuilder();
@@ -163,6 +158,40 @@ public class SimpleDebApplication {
 
             var repo = repoBuilder.build();
             var files = buildRepository.buildRepo(repo);
+            // this doesn't work, and it's not even close
+            /*
+            if (signingGroup != null) {
+                String signingKey;
+                String signingPubKey;
+                SigningGroup.AwsGroup param = signingGroup.getParam();
+                if (param != null) {
+                    SsmClientBuilder builder = SsmClient.builder();
+
+                    Optional.ofNullable(param.getRegion())
+                            .or(() -> Optional.ofNullable(region))
+                            .map(Region::of)
+                            .ifPresent(builder::region);
+
+                    try (var ssmClient = builder.build()) {
+                        signingKey = ssmClient.getParameter(GetParameterRequest.builder()
+                                        .name(param.getParamName())
+                                        .withDecryption(true)
+                                        .build())
+                                .parameter().value();
+                        signingPubKey = ssmClient.getParameter(GetParameterRequest.builder()
+                                        .name(param.getParamPubName())
+                                        .withDecryption(true)
+                                        .build())
+                                .parameter().value();
+                    }
+                } else {
+                    signingKey = Files.readString(signingGroup.getFsGroup().getPrivKey(), StandardCharsets.UTF_8);
+                    signingPubKey = Files.readString(signingGroup.getFsGroup().getPubKey(), StandardCharsets.UTF_8);
+                }
+
+                buildRepository.signFiles(files, signingKey, signingPubKey);
+            }
+            */
             output.writeFiles(files);
         }
 
@@ -213,6 +242,34 @@ public class SimpleDebApplication {
                 String region;
             }
         }
+
+        /*
+        @Data
+        static class SigningGroup {
+            @ArgGroup(exclusive = false)
+            FsGroup fsGroup;
+            @ArgGroup(exclusive = false)
+            AwsGroup param;
+
+            @Data
+            static class FsGroup {
+                @Option(names = {"--signing-key"})
+                Path privKey;
+                @Option(names = {"--signing-public-key"})
+                Path pubKey;
+            }
+
+            @Data
+            static class AwsGroup {
+                @Option(names = {"--signing-key-parameter"})
+                String paramName;
+                @Option(names = {"--signing-public-key-parameter"})
+                String paramPubName;
+                @Option(names = {"-skpr", "--signing-key-parameter-region"}, required = false)
+                String region;
+            }
+        }
+        */
     }
 
     @Command(name = "gpg", aliases = {"g"}, description = "gpg functions", subcommands = {

@@ -9,13 +9,17 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.images.builder.Transferable;
 
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @Slf4j
@@ -172,9 +176,35 @@ class BuildRepositoryTest {
     }
 
     @SneakyThrows
-    Container.ExecResult execInContainer(GenericContainer<?> container, String ...command) {
+    Container.ExecResult execInContainer(GenericContainer<?> container, String... command) {
         Container.ExecResult result = container.execInContainer(command);
         log.info("running command {} gave {}, with stdout: {} and stderr: {}", command, result.getExitCode(), result.getStdout(), result.getStderr());
         return result;
+    }
+
+    @SneakyThrows
+    @Test
+    void test() {
+        HashMap<String, FileIntegrity> files = new HashMap<>(Map.of(
+                "Release",
+                FileIntegrity.of(Files.readAllBytes(Path.of("/home/toor/priv-sign")), "Release")
+        ));
+        new BuildRepository()
+                .signFiles(
+                        files,
+                        Files.readString(Path.of("/home/toor/priv"), StandardCharsets.UTF_8),
+                        Files.readString(Path.of("/home/toor/privpub"), StandardCharsets.UTF_8)
+                );
+
+        assertThat(files.entrySet(), hasSize(3));
+
+        var headers = files.values().stream()
+                .map(FileIntegrity::getContent)
+                .map(String::new)
+                .filter(e -> e.startsWith("-----"))
+                .map(e -> e.split("\n")[0])
+                .collect(Collectors.toSet());
+
+        assertThat(headers, is(Set.of("-----BEGIN PGP SIGNED MESSAGE-----", "-----BEGIN PGP SIGNATURE-----")));
     }
 }
