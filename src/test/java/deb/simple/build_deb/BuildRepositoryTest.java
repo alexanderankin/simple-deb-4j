@@ -28,7 +28,7 @@ class BuildRepositoryTest {
     @Test
     void test_singlePackage() {
         var buildRepository = new BuildRepository();
-        var repoBuilder = buildRepository.repoBuilder(Instant.ofEpochMilli(1751437482822L));
+        var repoBuilder = buildRepository.repoBuilder(new DebRepoConfig(), Instant.ofEpochMilli(1751437482822L));
         repoBuilder.buildCodeName("jammy")
                 .addIndex(new DebPackageMeta()
                         .setSize(10)
@@ -140,7 +140,7 @@ class BuildRepositoryTest {
         );
 
         BuildRepository buildRepository = new BuildRepository();
-        var repo = buildRepository.repoBuilder(Instant.ofEpochMilli(1751384953000L))
+        var repo = buildRepository.repoBuilder(new DebRepoConfig(), Instant.ofEpochMilli(1751384953000L))
                 .buildCodeName("bullseye").addIndex(commonPackageIndex).addIndex(jqVersionReporterIndex).addIndex(jqVR2Index).build()
                 .buildCodeName("bookworm").addIndex(commonPackageIndex).addIndex(jqVersionReporterIndex).addIndex(jqVR2Index).build()
                 .build();

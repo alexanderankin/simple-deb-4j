@@ -31,12 +31,12 @@ public class BuildRepository {
      *
      * @return a {@link Repo} builder
      */
-    public RepoBuilder repoBuilder() {
-        return new RepoBuilder();
+    public RepoBuilder repoBuilder(DebRepoConfig config) {
+        return new RepoBuilder(config);
     }
 
-    public RepoBuilder repoBuilder(Instant now) {
-        return new RepoBuilder(now);
+    public RepoBuilder repoBuilder(DebRepoConfig config, Instant now) {
+        return new RepoBuilder(config, now);
     }
 
     /**
@@ -149,6 +149,7 @@ public class BuildRepository {
             final String codename;
             Set<DebArch> arches;
             Set<String> components;
+            Set<String> sections;
             Instant date;
             Map<String, FileIntegrity> packagesFiles;
 
@@ -166,6 +167,13 @@ public class BuildRepository {
                 return components;
             }
 
+            Set<String> sections() {
+                if (sections == null) {
+                    sections = new HashSet<>();
+                }
+                return sections;
+            }
+
             Map<String, FileIntegrity> packagesFiles() {
                 if (packagesFiles == null) {
                     packagesFiles = new HashMap<>();
@@ -180,14 +188,16 @@ public class BuildRepository {
     }
 
     public static class RepoBuilder {
+        final DebRepoConfig config;
         final Repo repo = new Repo();
         final Instant now;
 
-        RepoBuilder() {
-            this(Instant.now());
+        RepoBuilder(DebRepoConfig config) {
+            this(config, Instant.now());
         }
 
-        RepoBuilder(Instant now) {
+        RepoBuilder(DebRepoConfig config, Instant now) {
+            this.config = config;
             this.now = now;
         }
 
@@ -231,7 +241,7 @@ public class BuildRepository {
                 }
 
                 var br = new BuildRelease();
-                br.buildReleaseToString(codenameSection);
+                br.buildReleaseToString(repoBuilder.config, codenameSection);
 
                 return repoBuilder;
             }
@@ -248,6 +258,7 @@ public class BuildRepository {
 
             public CodenameSectionBuilder addIndex(DebPackageMeta meta) {
                 codenameSection.arches().add(meta.getDebPackageConfig().getMeta().getArch());
+                codenameSection.sections().add(meta.getDebPackageConfig().getControl().getSection());
                 codenameSection.components().add(meta.getDebPackageConfig().getControl().getSection());
                 debPackageMetaList.add(meta);
                 return this;

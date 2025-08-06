@@ -16,6 +16,7 @@ class BuildReleaseTest {
     void test() {
         BuildRelease buildRelease = new BuildRelease();
         String release = buildRelease.buildReleaseToString(
+                new DebRepoConfig(),
                 new BuildRepository.Repo.CodenameSection("jammy")
                         .setArches(Set.of(DebArch.amd64))
                         .setComponents(Set.of("main"))

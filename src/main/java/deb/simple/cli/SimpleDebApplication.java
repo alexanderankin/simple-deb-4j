@@ -109,6 +109,12 @@ public class SimpleDebApplication {
         @Option(names = {"-r", "--region", "--default-region"})
         String region;
 
+        @Option(names = {"-O", "--origin"})
+        String origin;
+
+        @Option(names = {"-L", "--label"})
+        String label;
+
         public void run() {
             log.info("{}", this);
 
@@ -146,7 +152,7 @@ public class SimpleDebApplication {
         @SneakyThrows
         private void run(List<String> codenames, BuildRepositoryIO input, BuildRepositoryIO output) {
             var buildRepository = new BuildRepository();
-            var repoBuilder = buildRepository.repoBuilder();
+            var repoBuilder = buildRepository.repoBuilder(new DebRepoConfig().setOrigin(origin).setLabel(label));
 
             var builders = input.readMetas();
             List<String> codeNamesFiltered = determineCodenames(codenames, new ArrayList<>(builders.keySet()));

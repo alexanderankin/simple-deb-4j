@@ -7,6 +7,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -22,8 +23,8 @@ public class BuildRelease {
         // System.out.print('#');
     }
 
-    public String buildReleaseToString(BuildRepository.Repo.CodenameSection codenameSection) {
-        var header = header(codenameSection);
+    public String buildReleaseToString(DebRepoConfig config, BuildRepository.Repo.CodenameSection codenameSection) {
+        var header = header(config, codenameSection);
 
         var packagesFiles = codenameSection.packagesFiles();
         var headerIntegrity = FileIntegrity.of(header, "Release");
@@ -40,17 +41,25 @@ public class BuildRelease {
         return release;
     }
 
-    String header(BuildRepository.Repo.CodenameSection codenameSection) {
+    String header(DebRepoConfig config,
+                  BuildRepository.Repo.CodenameSection codenameSection) {
         return """
-                Architectures: %s
+                Origin: %s
+                Label: %s
+                Suite: %s
                 Codename: %s
-                Components: main
+                Architectures: %s
+                Components: %s
                 Date: %s
                 Description: Repository for %s
                 """
                 .formatted(
-                        codenameSection.arches().stream().map(DebArch::toString).sorted().collect(Collectors.joining(" ")),
+                        Optional.ofNullable(config.getOrigin()).orElse(codenameSection.getCodename()),
+                        Optional.ofNullable(config.getLabel()).orElse(codenameSection.getCodename()),
                         codenameSection.getCodename(),
+                        codenameSection.getCodename(),
+                        codenameSection.arches().stream().map(DebArch::toString).sorted().collect(Collectors.joining(" ")),
+                        codenameSection.sections().stream().sorted().collect(Collectors.joining(" ")),
                         DATE_R_U.format(codenameSection.getDate()),
                         codenameSection.getCodename()
                 );
