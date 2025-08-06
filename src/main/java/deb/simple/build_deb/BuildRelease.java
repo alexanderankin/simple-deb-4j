@@ -31,9 +31,9 @@ public class BuildRelease {
 
         var release = header +
                 hashSection("MD5Sum", FileIntegrity::getMd5, packagesFiles) + "\n" +
-                hashSection("SHA1Sum", FileIntegrity::getSha1, packagesFiles) + "\n" +
-                hashSection("SHA256Sum", FileIntegrity::getSha256, packagesFiles) + "\n" +
-                hashSection("SHA512Sum", FileIntegrity::getSha512, packagesFiles) + "\n";
+                hashSection("SHA1", FileIntegrity::getSha1, packagesFiles) + "\n" +
+                hashSection("SHA256", FileIntegrity::getSha256, packagesFiles) + "\n" +
+                hashSection("SHA512", FileIntegrity::getSha512, packagesFiles) + "\n";
 
         log.debug("created release: {}", release);
         packagesFiles.put("Release", FileIntegrity.of(release, "Release"));

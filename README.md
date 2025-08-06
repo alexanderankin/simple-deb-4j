@@ -4,6 +4,10 @@ This project provides a library and command line tool for performing the debian 
 
 ## changes
 
+* version 0.0.7 - `Wed, 06 Aug 2025 05:11:57 -0400
+  * fix bug with hash labels (`SHA1Sum` -> `SHA1`, `SHA256Sum` -> `SHA256`, `SHA512Sum` -> `SHA512`)
+
+
 * version 0.0.6 - `Wed, 06 Aug 2025 03:21:48 -0400`
   * add ability to also create `.simple-deb-4j-index.json` files to reduce indexing IO
     * these files contain the initial config to make the `.deb`
