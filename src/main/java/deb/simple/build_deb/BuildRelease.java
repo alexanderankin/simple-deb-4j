@@ -59,7 +59,7 @@ public class BuildRelease {
                         codenameSection.getCodename(),
                         codenameSection.getCodename(),
                         codenameSection.arches().stream().map(DebArch::toString).sorted().collect(Collectors.joining(" ")),
-                        codenameSection.sections().stream().sorted().collect(Collectors.joining(" ")),
+                        codenameSection.components().stream().sorted().collect(Collectors.joining(" ")),
                         DATE_R_U.format(codenameSection.getDate()),
                         codenameSection.getCodename()
                 );

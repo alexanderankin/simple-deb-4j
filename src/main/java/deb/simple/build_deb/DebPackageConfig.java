@@ -131,6 +131,8 @@ public class DebPackageConfig {
         @NotNull
         @JsonAlias("Conflicts")
         String conflicts = "";
+        @JsonAlias("InstalledSize")
+        Integer installedSize;
         @NotBlank
         @JsonAlias("Maintainer")
         String maintainer = "";
@@ -159,13 +161,13 @@ public class DebPackageConfig {
                             Homepage: %s
                             Conflicts: %s
                             Architecture: %s
-                            Installed-Size: 10
+                            Installed-Size: %d
                             Maintainer: %s
                             Description: %s
                             """,
                     // optional fields
                     meta.getName(), meta.getVersion(), depends, recommends, section, priority,
-                    homepage, conflicts, meta.getArch(),
+                    homepage, conflicts, meta.getArch(), installedSize,
                     // required fields
                     maintainer, description
             ).strip() + "\n";

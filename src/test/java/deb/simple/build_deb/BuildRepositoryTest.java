@@ -65,25 +65,28 @@ class BuildRepositoryTest {
                         Description: description
                         """),
                 Map.entry("jammy/Release", """
-                        Architectures: amd64
+                        Origin: jammy
+                        Label: jammy
+                        Suite: jammy
                         Codename: jammy
+                        Architectures: amd64
                         Components: main
                         Date: Wed, 02 Jul 2025 06:24:42 +0000
                         Description: Repository for jammy
                         MD5Sum:
-                         e03ad37ef03cbaa936bf4116fc627974              126 Release
+                         5459e389d9457bfffafc30349c24996d              166 Release
                          301672485cd2b2c5f256d6b7fc00a4c5              481 main/binary-amd64/Packages
                          71d83cc9c9ab98e7e88bf80936a579d1              351 main/binary-amd64/Packages.gz
                         SHA1:
-                         5b3bc1755d4d7e170002300370d727e7af7e6c1a              126 Release
+                         edf3e29b4618a6dd7ca79211f14701feaf47b0b4              166 Release
                          743bace56e8c1701e48d2fd63fb8c18f48b669b4              481 main/binary-amd64/Packages
                          336aade40841d34777f8bb6fc430005c845e887d              351 main/binary-amd64/Packages.gz
                         SHA256:
-                         fdaa9ea78dd813665234f1eb1f6a31677ba6eb2a99c44c8fc7ae3eb7a682d209              126 Release
+                         9c0f546b1379c1005950dcce1032c784955b218262a53a777321ac9cae836762              166 Release
                          246bef0188a8e60855cab8206376c7989b494dcd27d1e91275006a99bd45c339              481 main/binary-amd64/Packages
                          7b196b75a13b6d34b57cf9203e8927ed112333c37c273217746d615f9a7463f7              351 main/binary-amd64/Packages.gz
                         SHA512:
-                         0a7ec56ab72e5bc19e65719f73b428ffb361aa9dcf5b73e31416cc3502b2d2b07c0f0166b58d826522892520b744d30fc72f3d4580b9e054f91d625b86a43452              126 Release
+                         fe7d6077c1fb44d816230e9ca39a3191a8eba9b19c07314021f12247a0fb35ee44bbf34f17d13fd56078925c801b379711411cc6dfe97968c35bc8f38e6b2e95              166 Release
                          fa5e46b9949739a155369e26939b5d9e562dd70b81f104391e661e81b78ac1621d25f5db75688af70ee840e7c78560fdabd5acf3fe6067f318744a89b25429dc              481 main/binary-amd64/Packages
                          7bdd10b20d55cb4e9ea9aa83f9942aa13c052026d03e040647f543642421adc897d7c3cb54e46a226116aa7774cd25fbe5ae97ae81a68d43853fb55ec4715735              351 main/binary-amd64/Packages.gz
                         """)

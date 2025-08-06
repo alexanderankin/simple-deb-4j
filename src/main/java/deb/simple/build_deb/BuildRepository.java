@@ -149,7 +149,6 @@ public class BuildRepository {
             final String codename;
             Set<DebArch> arches;
             Set<String> components;
-            Set<String> sections;
             Instant date;
             Map<String, FileIntegrity> packagesFiles;
 
@@ -165,13 +164,6 @@ public class BuildRepository {
                     components = new HashSet<>();
                 }
                 return components;
-            }
-
-            Set<String> sections() {
-                if (sections == null) {
-                    sections = new HashSet<>();
-                }
-                return sections;
             }
 
             Map<String, FileIntegrity> packagesFiles() {
@@ -258,7 +250,6 @@ public class BuildRepository {
 
             public CodenameSectionBuilder addIndex(DebPackageMeta meta) {
                 codenameSection.arches().add(meta.getDebPackageConfig().getMeta().getArch());
-                codenameSection.sections().add(meta.getDebPackageConfig().getControl().getSection());
                 codenameSection.components().add(meta.getDebPackageConfig().getControl().getSection());
                 debPackageMetaList.add(meta);
                 return this;

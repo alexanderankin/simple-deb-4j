@@ -7,11 +7,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.compress.archivers.ar.ArArchiveEntry;
 import org.apache.commons.compress.archivers.ar.ArArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.client.RestClient;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -19,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 @Data
@@ -40,18 +43,29 @@ public class BuildDeb {
         return arArchive;
     }
 
+    @SneakyThrows
     public byte[] buildDebToArchive(DebPackageConfig config) {
+        byte[] dataTarGz = createTarGz(
+                Optional.ofNullable(config.getFiles().getDataFiles()).orElseGet(List::of),
+                List.of()
+        );
+
+        int installedSize = 0;
+        try (var tis = new TarArchiveInputStream(new GZIPInputStream(new ByteArrayInputStream(dataTarGz)))) {
+            TarArchiveEntry entry;
+            while ((entry = tis.getNextEntry()) != null) {
+                if (entry.isFile())
+                    installedSize += (int) entry.getRealSize();
+            }
+        }
+        config.getControl().setInstalledSize(installedSize);
+
         byte[] controlTarGz = createTarGz(
                 Optional.ofNullable(config.getFiles().getControlFiles()).orElseGet(List::of),
                 List.of(new DebPackageConfig.TarFileSpec.TextTarFileSpec()
                         .setContent(config.getControl().render(config.getMeta()))
                         .setPath("control")
                         .setMode(null))
-        );
-
-        byte[] dataTarGz = createTarGz(
-                Optional.ofNullable(config.getFiles().getDataFiles()).orElseGet(List::of),
-                List.of()
         );
 
         return createArArchive(List.of(
