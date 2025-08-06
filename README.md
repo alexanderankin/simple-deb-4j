@@ -6,6 +6,8 @@ This project provides a library and command line tool for performing the debian 
 
 * version 0.0.8
   * exclude commons logging to silence warning
+  * include origin and label on Release
+  * actually calculate installed size
 
 * version 0.0.7 - `Wed, 06 Aug 2025 05:11:57 -0400
   * fix bug with hash labels (`SHA1Sum` -> `SHA1`, `SHA256Sum` -> `SHA256`, `SHA512Sum` -> `SHA512`)

@@ -39,6 +39,8 @@ public class BuildPackagesIndex {
         sb.append("Filename: ")
                 .append("pool/").append(poolPath).append("/")
                 .append(meta.getDebFilename()).append("\n");
+        if (debPackageMeta.getDebPackageConfig().getControl().getInstalledSize() != null)
+            sb.append("Installed-Size: ").append(debPackageMeta.getDebPackageConfig().getControl().getInstalledSize()).append("\n");
         sb.append("Size: ").append(debPackageMeta.getSize()).append("\n");
         sb.append("MD5sum: ").append(debPackageMeta.getHashes().getMd5()).append("\n");
         sb.append("SHA1: ").append(debPackageMeta.getHashes().getSha1()).append("\n");

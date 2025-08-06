@@ -58,7 +58,7 @@ public class BuildDeb {
                     installedSize += (int) entry.getRealSize();
             }
         }
-        config.getControl().setInstalledSize(installedSize);
+        config.getControl().setInstalledSize(installedSize / 1024);
 
         byte[] controlTarGz = createTarGz(
                 Optional.ofNullable(config.getFiles().getControlFiles()).orElseGet(List::of),
