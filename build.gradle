@@ -1,8 +1,8 @@
 plugins {
     id 'java'
     id 'application'
-    id 'com.google.cloud.tools.jib' version '3.4.5'
-    id 'com.gradleup.shadow' version '9.0.0-beta11'
+    id 'com.google.cloud.tools.jib' version '3.5.2' // https://plugins.gradle.org/plugin/com.google.cloud.tools.jib
+    id 'com.gradleup.shadow' version '9.3.1' // https://plugins.gradle.org/plugin/com.gradleup.shadow
     id 'jacoco'
 }
 
@@ -26,9 +26,10 @@ configurations {
 }
 
 dependencies {
-    implementation platform('org.springframework.boot:spring-boot-dependencies:3.4.4')
-    annotationProcessor platform('org.springframework.boot:spring-boot-dependencies:3.4.4')
-    implementation platform('io.awspring.cloud:spring-cloud-aws-dependencies:3.4.0')
+    implementation platform('org.springframework.boot:spring-boot-dependencies:3.5.10')
+    annotationProcessor platform('org.springframework.boot:spring-boot-dependencies:3.5.10')
+    implementation platform('org.springframework.cloud:spring-cloud-dependencies:2025.0.1')
+    implementation platform('io.awspring.cloud:spring-cloud-aws-dependencies:3.4.2')
 
     annotationProcessor 'org.projectlombok:lombok'
     compileOnly 'org.projectlombok:lombok'
@@ -63,3 +64,52 @@ tasks.named('assemble').get().dependsOn tasks.register('ghaCopyFilesSrcPublic', 
     from 'src/public'
     into 'build/public'
 }
+
+def buildDebConfig = tasks.register('buildDebConfig') {
+    def o = layout.buildDirectory.dir('debConfig').map {it.file('debConfig.yaml') }
+    def versionValue = version
+    def sourcePathValue = "build/libs/simple-deb-4j-${version}-all.jar"
+    outputs.file o
+    doLast {
+        o.get().asFile.text = """
+                meta:
+                  name: simple-deb-4j
+                  arch: all
+                  version: ${versionValue}
+                control:
+                  depends: ""
+                  recommends: ""
+                  section: ""
+                  priority: ""
+                  homepage: ""
+                  maintainer: "simple-deb-4j"
+                  description: "simple-deb-4j"
+                files:
+                  controlFiles: []
+                  dataFiles:
+                    - type: text
+                      path: /usr/bin/simple-deb-4j
+                      content: "#!/usr/bin/env bash\\njava -jar /usr/bin/simple-deb-4j.jar \\"\$@\\""
+                      mode: 0x755
+                    - type: file
+                      path: /usr/bin/simple-deb-4j.jar
+                      sourcePath: "${sourcePathValue}"
+                """
+    }
+}
+
+def buildDeb = tasks.register('buildDeb', JavaExec) {
+    dependsOn buildDebConfig, 'shadowJar'
+
+    inputs.file buildDebConfig.map { it.outputs.files.singleFile }
+    inputs.property 'version', version
+    inputs.file tasks.named('shadowJar').map { it.outputs.files.singleFile }
+    outputs.dir layout.buildDirectory.dir('deb')
+
+    mainClass = application.mainClass.get()
+    classpath = sourceSets.main.runtimeClasspath
+    args = ['build', '-c', layout.buildDirectory.file('debConfig/debConfig.yaml').get().asFile.path, '-o', 'build/deb']
+}
+
+tasks.build.dependsOn buildDeb
+tasks.assemble.dependsOn buildDeb

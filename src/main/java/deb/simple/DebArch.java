@@ -24,6 +24,10 @@ public enum DebArch {
      * <code>sudo apt install qemu-system-misc</code>
      */
     riscv64("riscv64"),
+    /**
+     * package intended for all architectures
+     */
+    all("all"),
     ;
 
     private static final Map<String, DebArch> MAP = Arrays.stream(values())
