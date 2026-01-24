@@ -10,8 +10,8 @@ This project provides a library and command line tool for performing the debian 
   * publish simple-deb-4j as a debian archive:
     ```shell
     name=$(curl -s https://api.github.com/repos/alexanderankin/simple-deb-4j/releases/latest | jq -r .name); \
-      wget https://github.com/alexanderankin/simple-deb-4j/releases/download/${name}/simple-deb-4j_${name}_all.deb; \
-      sudo apt install -y ./simple-deb-4j_${name}_all.deb;
+      wget https://github.com/alexanderankin/simple-deb-4j/releases/download/${name}/simple-deb-4j_${name:1}_all.deb; \
+      sudo apt install -y ./simple-deb-4j_${name:1}_all.deb;
       ```
 
 * version 0.0.8 - `Wed, 06 Aug 2025 07:19:12 -0400`
