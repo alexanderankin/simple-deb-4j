@@ -24,6 +24,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -211,8 +212,8 @@ class BuildDebTest {
                             /opt/spec-type-dir/b
                             /opt/spec-type-dir/b/file.txt
                             /opt/spec-type-dir/b/README.txt
-                            """,
-                    find.getStdout()
+                            """.lines().sorted().collect(Collectors.joining("\n")),
+                    find.getStdout().lines().sorted().collect(Collectors.joining("\n"))
             );
 
             assertEquals("Sed ut perspiciatis", genericContainer.execInContainer(
