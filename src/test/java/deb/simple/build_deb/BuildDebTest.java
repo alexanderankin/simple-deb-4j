@@ -172,4 +172,63 @@ class BuildDebTest {
             }
         }
     }
+
+    @SneakyThrows
+    @Test
+    void test_specTypeDir() {
+        var config = validate(new DebPackageConfig()
+                .setMeta(new PackageMeta().setName("spec-type-dir").setVersion("0.0.1").setArch(DebArch.current()))
+                .setControl(new ControlExtras().setMaintainer("m").setDescription("d"))
+                .setFiles(new DebFileSpec().setDataFiles(List.of(
+                        new DebPackageConfig.TarFileSpec.DirTarFileSpec()
+                                .setSourcePath("src/test/resources/deb/simple/build_deb/spec-type-dir")
+                                .setPath("/opt/spec-type-dir")))));
+
+        var built = buildDeb.buildDebToArchive(config);
+        var filename = config.getMeta().getDebFilename();
+        var containerPath = "/tmp/" + filename;
+
+        try (GenericContainer<?> genericContainer = new GenericContainer<>("debian:12-slim")) {
+            genericContainer
+                    .withCreateContainerCmdModifier(c -> c.withEntrypoint("tail", "-f", "/dev/null"))
+                    .withCopyToContainer(Transferable.of(built), containerPath);
+            genericContainer.start();
+
+            var install = genericContainer.execInContainer(("apt-get install -y " + containerPath).split(" "));
+            assertEquals(0, install.getExitCode(), () -> "install failed: " + install);
+
+            var find = genericContainer.execInContainer("find /opt/spec-type-dir".split(" "));
+            assertEquals(0, find.getExitCode(), () -> "find failed: " + find);
+            assertEquals(
+                    """
+                            /opt/spec-type-dir
+                            /opt/spec-type-dir/a
+                            /opt/spec-type-dir/a/1
+                            /opt/spec-type-dir/a/2
+                            /opt/spec-type-dir/a/3
+                            /opt/spec-type-dir/c
+                            /opt/spec-type-dir/c/test
+                            /opt/spec-type-dir/b
+                            /opt/spec-type-dir/b/file.txt
+                            /opt/spec-type-dir/b/README.txt
+                            """,
+                    find.getStdout()
+            );
+
+            assertEquals("Sed ut perspiciatis", genericContainer.execInContainer(
+                    "cat /opt/spec-type-dir/a/1".split(" ")).getStdout().strip());
+            assertEquals("unde omnis iste natus error sit", genericContainer.execInContainer(
+                    "cat /opt/spec-type-dir/a/2".split(" ")).getStdout().strip());
+            assertEquals("voluptatem accusantium doloremque", genericContainer.execInContainer(
+                    "cat /opt/spec-type-dir/a/3".split(" ")).getStdout().strip());
+            assertEquals("this is a file", genericContainer.execInContainer(
+                    "cat /opt/spec-type-dir/b/file.txt".split(" ")).getStdout().strip());
+            assertEquals("# README", genericContainer.execInContainer(
+                    "cat /opt/spec-type-dir/b/README.txt".split(" ")).getStdout().strip());
+            assertEquals("test", genericContainer.execInContainer(
+                    "cat /opt/spec-type-dir/c/test".split(" ")).getStdout().strip());
+        }
+    }
+
+    // todo test about file modes
 }

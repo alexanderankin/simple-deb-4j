@@ -1,5 +1,6 @@
 package deb.simple.build_deb;
 
+import deb.simple.build_deb.DebPackageConfig.TarFileSpec.DirTarFileSpec.ModeMode;
 import lombok.Data;
 import lombok.SneakyThrows;
 import lombok.experimental.Accessors;
@@ -9,12 +10,15 @@ import org.apache.commons.compress.archivers.ar.ArArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+import org.apache.commons.compress.archivers.tar.TarConstants;
 import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.client.RestClient;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -86,11 +90,62 @@ public class BuildDeb {
 
             for (DebPackageConfig.TarFileSpec f : allFiles) {
 
+                if (f instanceof DebPackageConfig.TarFileSpec.DirTarFileSpec dir) {
+                    var targetPath = Path.of(dir.path);
+                    var sourcePath = Path.of(dir.sourcePath);
+                    try (var stream = Files.walk(sourcePath)) {
+                        stream.forEach(each -> {
+                            var isDirectory = Files.isDirectory(each);
+                            var relative = sourcePath.relativize(each);
+                            var targetAbs = targetPath.resolve(relative);
+
+                            var tarEntryPath = targetAbs + (isDirectory ? "/" : "");
+                            TarArchiveEntry entry = new TarArchiveEntry(tarEntryPath);
+
+                            byte[] content = null;
+                            if (Files.isRegularFile(each)) {
+                                try {
+                                    content = Files.readAllBytes(each);
+                                } catch (IOException e) {
+                                    throw new RuntimeException(e);
+                                }
+                                entry.setSize(content.length);
+                            }
+
+                            if (dir.getModeMode() == ModeMode.INHERIT) {
+                                if (f.getMode() != null)
+                                    entry.setMode(f.getMode());
+                            }
+                            if (dir.getModeMode() == ModeMode.OVERRIDE) {
+                                if (dir.getModeOverrides() != null) {
+                                    var relKey = relative.toString().replace(File.separatorChar, '/');
+                                    var mode = dir.getModeOverrides().get(relKey);
+
+                                    if (mode != null)
+                                        entry.setMode(mode);
+                                }
+                            }
+
+                            try {
+                                tarOut.putArchiveEntry(entry);
+                                if (content != null)
+                                    tarOut.write(content);
+                                tarOut.closeArchiveEntry();
+                            } catch (IOException e) {
+                                throw new RuntimeException(e);
+                            }
+                        });
+                    }
+                    continue;
+                }
+
                 byte[] content = switch (f) {
                     case DebPackageConfig.TarFileSpec.TextTarFileSpec text -> text.getContent().getBytes();
                     case DebPackageConfig.TarFileSpec.BinaryTarFileSpec bin -> bin.getContent();
-                    case DebPackageConfig.TarFileSpec.FileTarFileSpec fs -> Files.readAllBytes(current.resolve(fs.getSourcePath()));
+                    case DebPackageConfig.TarFileSpec.FileTarFileSpec fs ->
+                            Files.readAllBytes(current.resolve(fs.getSourcePath()));
                     case DebPackageConfig.TarFileSpec.UrlTarFileSpec fs -> downloadUrlTarFile(fs);
+                    default -> throw new IllegalStateException();
                 };
                 TarArchiveEntry entry = new TarArchiveEntry(f.getPath());
                 entry.setSize(content.length);
@@ -107,7 +162,7 @@ public class BuildDeb {
         return out.toByteArray();
     }
 
-    private static byte[] downloadUrlTarFile(DebPackageConfig.TarFileSpec.UrlTarFileSpec fs) {
+    private byte[] downloadUrlTarFile(DebPackageConfig.TarFileSpec.UrlTarFileSpec fs) {
         byte[] result = RestClient.create()
                 .get()
                 .uri(fs.url)

@@ -15,6 +15,7 @@ import org.apache.commons.lang3.StringUtils;
 import java.net.URI;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Data
 @Accessors(chain = true)
@@ -35,11 +36,13 @@ public class DebPackageConfig {
             @JsonSubTypes.Type(value = TarFileSpec.TextTarFileSpec.class, name = "text"),
             @JsonSubTypes.Type(value = TarFileSpec.BinaryTarFileSpec.class, name = "binary"),
             @JsonSubTypes.Type(value = TarFileSpec.FileTarFileSpec.class, name = "file"),
+            @JsonSubTypes.Type(value = TarFileSpec.DirTarFileSpec.class, name = "dir"),
             @JsonSubTypes.Type(value = TarFileSpec.UrlTarFileSpec.class, name = "url"),
     })
     @Data
     @Accessors(chain = true)
     public static sealed abstract class TarFileSpec {
+        @NotBlank
         String path;
         Integer mode;
 
@@ -71,6 +74,25 @@ public class DebPackageConfig {
         public static final class FileTarFileSpec extends TarFileSpec {
             @NotBlank
             String sourcePath;
+        }
+
+        @ToString(callSuper = true)
+        @EqualsAndHashCode(callSuper = true)
+        @Data
+        @Accessors(chain = true)
+        @JsonIgnoreProperties(ignoreUnknown = true)
+        public static final class DirTarFileSpec extends TarFileSpec {
+            @NotBlank
+            String sourcePath;
+
+            @NotNull
+            ModeMode modeMode = ModeMode.INHERIT;
+
+            Map<String, Integer> modeOverrides;
+
+            public enum ModeMode {
+                INHERIT, OVERRIDE
+            }
         }
 
         @ToString(callSuper = true)

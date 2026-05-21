@@ -90,6 +90,7 @@
         { "$ref": "#/$defs/TextTarFileSpec" },
         { "$ref": "#/$defs/BinaryTarFileSpec" },
         { "$ref": "#/$defs/FileTarFileSpec" },
+        { "$ref": "#/$defs/DirTarFileSpec" },
         { "$ref": "#/$defs/UrlTarFileSpec" }
       ]
     },
@@ -143,6 +144,25 @@
         "sourcePath": {
           "type": "string",
           "description": "Path to the source file on disk"
+        },
+        "mode": {
+          "type": "integer"
+        }
+      }
+    },
+    "DirTarFileSpec": {
+      "type": "object",
+      "required": ["path", "sourcePath"],
+      "properties": {
+        "type": {
+          "const": "dir"
+        },
+        "path": {
+          "type": "string"
+        },
+        "sourcePath": {
+          "type": "string",
+          "description": "Path to the source directory on disk"
         },
         "mode": {
           "type": "integer"

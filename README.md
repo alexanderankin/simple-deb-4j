@@ -4,6 +4,9 @@ This project provides a library and command line tool for performing the debian 
 
 ## changes
 
+* version 0.0.10
+  * can specify entire directory to pack away into the `.deb` file
+
 * version 0.0.9
   * update dependencies
   * support `all` for non-arch-specific packages
