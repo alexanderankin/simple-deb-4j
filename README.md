@@ -4,6 +4,9 @@ This project provides a library and command line tool for performing the debian 
 
 ## changes
 
+* version 0.0.11
+  * gpg signing works and has test
+
 * version 0.0.10
   * can specify entire directory to pack away into the `.deb` file
 
