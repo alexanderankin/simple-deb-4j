@@ -66,7 +66,7 @@ class BuildDebTest {
 
         var fileName = meta.getDebFilename();
 
-        try (GenericContainer<?> genericContainer = new GenericContainer<>("debian:12-slim")) {
+        try (GenericContainer<?> genericContainer = new GenericContainer<>("debian:13-slim")) {
             genericContainer
                     .withCreateContainerCmdModifier(c -> c.withEntrypoint("tail", "-f", "/dev/null"))
                     .withCopyToContainer(Transferable.of(deb), "/tmp/" + fileName);
@@ -93,7 +93,7 @@ class BuildDebTest {
         assertEquals(1, config.getFiles().getControlFiles().size());
         assertEquals(0x755, config.getFiles().getControlFiles().getFirst().getMode());
 
-        try (GenericContainer<?> genericContainer = new GenericContainer<>("debian:12-slim")) {
+        try (GenericContainer<?> genericContainer = new GenericContainer<>("debian:13-slim")) {
             genericContainer
                     .withCreateContainerCmdModifier(c -> c.withEntrypoint("tail", "-f", "/dev/null"))
                     .withCopyToContainer(Transferable.of(archive), "/tmp/" + fileName);
@@ -123,7 +123,7 @@ class BuildDebTest {
             buildDeb.current = path;
             byte[] archive = buildDeb.buildDebToArchive(config);
 
-            try (GenericContainer<?> genericContainer = new GenericContainer<>("debian:12-slim")) {
+            try (GenericContainer<?> genericContainer = new GenericContainer<>("debian:13-slim")) {
                 genericContainer
                         .withCreateContainerCmdModifier(c -> c.withEntrypoint("tail", "-f", "/dev/null"))
                         .withCopyToContainer(Transferable.of(archive), "/tmp/" + fileName);
@@ -158,7 +158,7 @@ class BuildDebTest {
             byte[] aArchive = buildDeb.buildDebToArchive(aConfig);
             byte[] bArchive = buildDeb.buildDebToArchive(bConfig);
 
-            try (GenericContainer<?> genericContainer = new GenericContainer<>("debian:12-slim")) {
+            try (GenericContainer<?> genericContainer = new GenericContainer<>("debian:13-slim")) {
                 genericContainer
                         .withCreateContainerCmdModifier(c -> c.withEntrypoint("tail", "-f", "/dev/null"))
                         .withCopyToContainer(Transferable.of(aArchive), "/tmp/" + aConfig.getMeta().getDebFilename())
@@ -189,7 +189,7 @@ class BuildDebTest {
         var filename = config.getMeta().getDebFilename();
         var containerPath = "/tmp/" + filename;
 
-        try (GenericContainer<?> genericContainer = new GenericContainer<>("debian:12-slim")) {
+        try (GenericContainer<?> genericContainer = new GenericContainer<>("debian:13-slim")) {
             genericContainer
                     .withCreateContainerCmdModifier(c -> c.withEntrypoint("tail", "-f", "/dev/null"))
                     .withCopyToContainer(Transferable.of(built), containerPath);

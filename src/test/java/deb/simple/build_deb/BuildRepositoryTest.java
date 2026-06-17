@@ -149,7 +149,7 @@ class BuildRepositoryTest {
                 .build();
         var repoFiles = buildRepository.buildRepo(repo);
 
-        try (GenericContainer<?> genericContainer = new GenericContainer<>("debian:12-slim")) {
+        try (GenericContainer<?> genericContainer = new GenericContainer<>("debian:13-slim")) {
             genericContainer
                     .withCreateContainerCmdModifier(c -> c.withEntrypoint("tail", "-f", "/dev/null"));
 
