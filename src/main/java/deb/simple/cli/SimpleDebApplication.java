@@ -261,17 +261,17 @@ public class SimpleDebApplication {
 
             @Data
             static class FsGroup {
-                @Option(names = {"--signing-key"})
+                @Option(names = {"--signing-key"}, required = true)
                 Path privKey;
-                @Option(names = {"--signing-public-key"})
+                @Option(names = {"--signing-public-key"}, required = true)
                 Path pubKey;
             }
 
             @Data
             static class AwsGroup {
-                @Option(names = {"--signing-key-parameter"})
+                @Option(names = {"--signing-key-parameter"}, required = true)
                 String paramName;
-                @Option(names = {"--signing-public-key-parameter"})
+                @Option(names = {"--signing-public-key-parameter"}, required = true)
                 String paramPubName;
                 @Option(names = {"-skpr", "--signing-key-parameter-region"}, required = false)
                 String region;
