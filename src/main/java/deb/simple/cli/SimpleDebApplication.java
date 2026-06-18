@@ -20,11 +20,17 @@ import picocli.CommandLine.Option;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3ClientBuilder;
+import software.amazon.awssdk.services.ssm.SsmClient;
+import software.amazon.awssdk.services.ssm.SsmClientBuilder;
+import software.amazon.awssdk.services.ssm.model.GetParameterRequest;
+import software.amazon.awssdk.services.ssm.model.GetParametersRequest;
 
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
 
@@ -101,10 +107,8 @@ public class SimpleDebApplication {
         @ArgGroup(multiplicity = "1")
         OutputGroup outputGroup;
 
-        /*
         @ArgGroup
         SigningGroup signingGroup;
-        */
 
         @Option(names = {"-r", "--region", "--default-region"})
         String region;
@@ -164,8 +168,6 @@ public class SimpleDebApplication {
 
             var repo = repoBuilder.build();
             var files = buildRepository.buildRepo(repo);
-            // this doesn't work, and it's not even close
-            /*
             if (signingGroup != null) {
                 String signingKey;
                 String signingPubKey;
@@ -179,25 +181,26 @@ public class SimpleDebApplication {
                             .ifPresent(builder::region);
 
                     try (var ssmClient = builder.build()) {
-                        signingKey = ssmClient.getParameter(GetParameterRequest.builder()
-                                        .name(param.getParamName())
+                        var params = ssmClient.getParameters(GetParametersRequest.builder()
+                                        .names(param.getParamName(), param.getParamPubName())
                                         .withDecryption(true)
                                         .build())
-                                .parameter().value();
-                        signingPubKey = ssmClient.getParameter(GetParameterRequest.builder()
-                                        .name(param.getParamPubName())
-                                        .withDecryption(true)
-                                        .build())
-                                .parameter().value();
+                                .parameters();
+                        signingKey = params.stream().filter(p -> p.name().equals(param.getParamName())).findAny().orElseThrow().value();
+                        signingPubKey = params.stream().filter(p -> p.name().equals(param.getParamPubName())).findAny().orElseThrow().value();
                     }
                 } else {
                     signingKey = Files.readString(signingGroup.getFsGroup().getPrivKey(), StandardCharsets.UTF_8);
                     signingPubKey = Files.readString(signingGroup.getFsGroup().getPubKey(), StandardCharsets.UTF_8);
                 }
 
-                buildRepository.signFiles(files, signingKey, signingPubKey);
+                var signedFiles = buildRepository.signRepo(files, signingKey, signingPubKey);
+                var tmp = new HashMap<String, FileIntegrity>();
+                tmp.putAll(files);
+                tmp.putAll(signedFiles);
+                tmp.put("repository.gpg", FileIntegrity.of(signingPubKey, null));
+                files = tmp;
             }
-            */
             output.writeFiles(files);
         }
 
@@ -249,7 +252,6 @@ public class SimpleDebApplication {
             }
         }
 
-        /*
         @Data
         static class SigningGroup {
             @ArgGroup(exclusive = false)
@@ -275,14 +277,13 @@ public class SimpleDebApplication {
                 String region;
             }
         }
-        */
     }
 
     @Command(name = "gpg", aliases = {"g"}, description = "gpg functions", subcommands = {
             Gpg.GpgGenKey.class
     })
     static class Gpg {
-        @Command(name = "gen-key", aliases = {"gk"}, description = "generate gpg key")
+        @Command(name = "gen-key", aliases = {"keygen", "gk"}, description = "generate gpg key")
         static class GpgGenKey implements Runnable {
             @CommandLine.Parameters(description = "name", index = "0")
             String name;

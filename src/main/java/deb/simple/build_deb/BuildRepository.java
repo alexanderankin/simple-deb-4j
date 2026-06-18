@@ -54,6 +54,28 @@ public class BuildRepository {
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 
+    public Map<String, FileIntegrity> signRepo(Map<String, FileIntegrity> repoFiles, String key, String signingPubKey) {
+        Map<String, FileIntegrity> signedFiles = new HashMap<>();
+        var debRepoSigning = new DebRepoSigning();
+        for (var entry : repoFiles.entrySet()) {
+            var parts = Arrays.asList(entry.getKey().split("/"));
+            if (parts.getLast().equals("Release")) {
+                var signedRelease = debRepoSigning.signRelease(entry.getValue().getContent(), key);
+
+                var pathToCodenameDistFiles = String.join("/", parts.subList(0, parts.size() - 1));
+                signedFiles.put(pathToCodenameDistFiles + "/InRelease",
+                        FileIntegrity.of(signedRelease.getInRelease(), "InRelease"));
+
+                signedFiles.put(pathToCodenameDistFiles + "/Release.gpg",
+                        FileIntegrity.of(signedRelease.getReleaseGpg(), "Release.gpg"));
+
+                signedFiles.put(pathToCodenameDistFiles + "/repository.gpg",
+                        FileIntegrity.of(signingPubKey, "repository.gpg"));
+            }
+        }
+        return signedFiles;
+    }
+
     // <T> Stream<T> streamFromIterator(Iterator<T> i) {
     //     return StreamSupport.stream(Spliterators.spliteratorUnknownSize(i, 0), false);
     // }

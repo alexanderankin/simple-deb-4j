@@ -3,6 +3,7 @@ package deb.simple.build_deb;
 import lombok.Data;
 import lombok.SneakyThrows;
 import lombok.experimental.Accessors;
+import org.pgpainless.sop.GenerateKeyImpl;
 import org.pgpainless.sop.SOPImpl;
 import sop.SOP;
 import sop.enums.InlineSignAs;
@@ -15,7 +16,7 @@ public class DebRepoSigning {
     @SneakyThrows
     public SigningKey genKey(String uid) {
         byte[] privateKey = SOP.generateKey()
-                // .profile("rfc4880") // RSA; safest compatibility for apt/gpgv
+                .profile(GenerateKeyImpl.RFC4880_RSA4096_PROFILE) // RSA; safest compatibility for apt/gpgv
                 .userId(uid)
                 .generate()
                 .getBytes();
