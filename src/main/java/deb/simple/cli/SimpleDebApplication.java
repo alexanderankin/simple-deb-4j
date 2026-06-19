@@ -10,19 +10,22 @@ import jakarta.validation.Validation;
 import jakarta.validation.ValidatorFactory;
 import lombok.Data;
 import lombok.SneakyThrows;
+import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.pgpainless.key.generation.type.rsa.RsaLength;
 import picocli.AutoComplete;
 import picocli.CommandLine;
 import picocli.CommandLine.ArgGroup;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
+import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3ClientBuilder;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.ssm.SsmClient;
 import software.amazon.awssdk.services.ssm.SsmClientBuilder;
-import software.amazon.awssdk.services.ssm.model.GetParameterRequest;
 import software.amazon.awssdk.services.ssm.model.GetParametersRequest;
 
 import java.net.URI;
@@ -60,10 +63,10 @@ public class SimpleDebApplication {
 
     @Command(name = "build", aliases = {"b"}, description = "build a debian package")
     static class Build implements Runnable {
-        @Option(names = {"-c", "--config"}, description = "configuration file")
+        @Option(names = {"-c", "--config"}, description = "configuration file", required = true)
         Path configFile;
-        @Option(names = {"-o", "--output"}, description = "output directory")
-        Path outDir;
+        @ArgGroup
+        BuildOutput buildOutput;
         @Option(names = {"-i", "--index"}, description = "produce index package - suitable for indexing but not installable")
         boolean index = false;
         @Option(names = {"-C"}, description = "change directory before running (defaults to $PWD)")
@@ -85,11 +88,67 @@ public class SimpleDebApplication {
                 if (!errors.isEmpty())
                     throw new ConstraintViolationException(errors);
             }
-            var deb = new BuildDeb()
-                    .setCurrent(current)
-                    .buildDeb(config, outDir);
-            if (index)
-                new BuildIndex().buildDebIndex(deb, config, outDir);
+            if (buildOutput.getOutDir() != null) {
+                var outDir = buildOutput.getOutDir();
+                var deb = new BuildDeb()
+                        .setCurrent(current)
+                        .buildDeb(config, outDir);
+                if (index)
+                    new BuildIndex().buildDebIndex(deb, config, outDir);
+            } else if (buildOutput.getS3Output() != null) {
+                var pkgBytes = new BuildDeb().setCurrent(current).buildDebToArchive(config);
+                var indexBytes = new BuildIndex().buildDebIndexToBytes(pkgBytes, config);
+
+                S3ClientBuilder builder = S3Client.builder();
+                Optional.ofNullable(buildOutput.getS3Output().getRegion())
+                        .map(Region::of)
+                        .map(builder::region);
+                try (S3Client s3Client = builder.build()) {
+                    var s3Url = buildOutput.getS3Output().getS3Url();
+                    s3Client.putObject(
+                            PutObjectRequest.builder()
+                                    .bucket(s3Url.getHost())
+                                    .key(StringUtils.strip(s3Url.getPath(), "/") + "/" + config.getMeta().getDebFilename())
+                                    .build(),
+                            RequestBody.fromBytes(pkgBytes));
+
+                    s3Client.putObject(
+                            PutObjectRequest.builder()
+                                    .bucket(s3Url.getHost())
+                                    .key(StringUtils.strip(s3Url.getPath(), "/") + "/" + config.getMeta().getIndexFilename())
+                                    .build(),
+                            RequestBody.fromBytes(indexBytes));
+                }
+            } else {
+                throw new UnsupportedOperationException("need either one of: -o, -s3o");
+            }
+        }
+
+        @Data
+        @Accessors(chain = true)
+        public static class BuildOutput {
+            @Option(names = {"-o", "--output"}, description = "output directory")
+            Path outDir;
+            @ArgGroup(exclusive = false)
+            BuildS3Output s3Output;
+
+            @Data
+            @Accessors(chain = true)
+            public static class BuildS3Output {
+                @Option(names = {"-s3o", "--s3-output"}, description = "s3 output", required = true)
+                URI s3Url;
+
+                @Option(names = {"--region", "-s3o-region", "--s3-output-region"}, description = "s3 region")
+                String region;
+
+                @Option(names = {"-cn", "--codename"}, description = "codename (subdir of ./pool)", required = true)
+                Codename codename;
+
+                public enum Codename {
+                    jammy, noble, resolute,
+                    bullseye, bookworm, trixie,
+                }
+            }
         }
     }
 
