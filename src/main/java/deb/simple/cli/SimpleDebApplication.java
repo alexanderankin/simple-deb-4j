@@ -105,17 +105,18 @@ public class SimpleDebApplication {
                         .map(builder::region);
                 try (S3Client s3Client = builder.build()) {
                     var s3Url = buildOutput.getS3Output().getS3Url();
+                    var cn = buildOutput.getS3Output().getCodename();
                     s3Client.putObject(
                             PutObjectRequest.builder()
                                     .bucket(s3Url.getHost())
-                                    .key(StringUtils.strip(s3Url.getPath(), "/") + "/" + config.getMeta().getDebFilename())
+                                    .key(StringUtils.strip(s3Url.getPath(), "/") + "/" + cn + "/" + config.getMeta().getDebFilename())
                                     .build(),
                             RequestBody.fromBytes(pkgBytes));
 
                     s3Client.putObject(
                             PutObjectRequest.builder()
                                     .bucket(s3Url.getHost())
-                                    .key(StringUtils.strip(s3Url.getPath(), "/") + "/" + config.getMeta().getIndexFilename())
+                                    .key(StringUtils.strip(s3Url.getPath(), "/") + "/" + cn + "/" + config.getMeta().getIndexFilename())
                                     .build(),
                             RequestBody.fromBytes(indexBytes));
                 }
