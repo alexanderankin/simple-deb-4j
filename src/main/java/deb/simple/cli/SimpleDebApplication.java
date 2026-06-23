@@ -14,6 +14,7 @@ import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.pgpainless.key.generation.type.rsa.RsaLength;
+import org.springframework.util.Assert;
 import picocli.AutoComplete;
 import picocli.CommandLine;
 import picocli.CommandLine.ArgGroup;
@@ -32,10 +33,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 @Slf4j
 @Command(
@@ -65,6 +63,9 @@ public class SimpleDebApplication {
     static class Build implements Runnable {
         @Option(names = {"-c", "--config"}, description = "configuration file", required = true)
         Path configFile;
+        @Option(names = {"-p", "--param", "--parameter"},
+                description = "envsubst style key value pairs, e.g. for '-p ARCH=amd64', will substitute all __ARCH__ in config file with text 'amd64'")
+        List<String> parameters;
         @ArgGroup
         BuildOutput buildOutput;
         @Option(names = {"-i", "--index"}, description = "produce index package - suitable for indexing but not installable")
@@ -77,11 +78,20 @@ public class SimpleDebApplication {
         public void run() {
             var mapper = JsonMapper.builder().findAndAddModules().build();
             var yamlMapper = YAMLMapper.builder().findAndAddModules().build();
+            var configFileContent = Files.readString(configFile);
+            for (var param : Objects.requireNonNullElse(parameters, List.<String>of())) {
+                var split = Arrays.asList(param.split("="));
+                Assert.isTrue(split.size() == 2,
+                        () -> "param should be in format k=v, but was: " + param);
+                Assert.isTrue(split.getFirst().equals(split.getFirst().toUpperCase()),
+                        () -> "param 'key' should be uppercase, but was: " + split.getFirst());
+                configFileContent = configFileContent.replace("__" + split.getFirst() + "__", split.getLast());
+            }
             DebPackageConfig config;
             try {
-                config = mapper.readValue(configFile.toFile(), DebPackageConfig.class);
+                config = mapper.readValue(configFileContent, DebPackageConfig.class);
             } catch (JsonProcessingException jpe) {
-                config = yamlMapper.readValue(configFile.toFile(), DebPackageConfig.class);
+                config = yamlMapper.readValue(configFileContent, DebPackageConfig.class);
             }
             try (ValidatorFactory validatorFactory = Validation.buildDefaultValidatorFactory()) {
                 var errors = validatorFactory.getValidator().validate(config);
