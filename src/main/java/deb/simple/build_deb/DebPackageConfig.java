@@ -38,6 +38,8 @@ public class DebPackageConfig {
             @JsonSubTypes.Type(value = TarFileSpec.FileTarFileSpec.class, name = "file"),
             @JsonSubTypes.Type(value = TarFileSpec.DirTarFileSpec.class, name = "dir"),
             @JsonSubTypes.Type(value = TarFileSpec.UrlTarFileSpec.class, name = "url"),
+            @JsonSubTypes.Type(value = TarFileSpec.S3ObjectTarFileSpec.class, name = "s3"),
+            @JsonSubTypes.Type(value = TarFileSpec.S3ZipArchiveTarFileSpec.class, name = "s3zip"),
     })
     @Data
     @Accessors(chain = true)
@@ -105,6 +107,27 @@ public class DebPackageConfig {
             URI url;
             String bearerToken;
             LinkedHashMap<String, List<String>> headers;
+        }
+
+        @ToString(callSuper = true)
+        @EqualsAndHashCode(callSuper = true)
+        @Data
+        @Accessors(chain = true)
+        @JsonIgnoreProperties(ignoreUnknown = true)
+        public static sealed class S3ObjectTarFileSpec extends TarFileSpec {
+            @NotNull
+            URI s3Url;
+            String region;
+        }
+
+        @ToString(callSuper = true)
+        @EqualsAndHashCode(callSuper = true)
+        @Data
+        @Accessors(chain = true)
+        @JsonIgnoreProperties(ignoreUnknown = true)
+        public static final class S3ZipArchiveTarFileSpec extends S3ObjectTarFileSpec {
+            @NotNull
+            String zipPath;
         }
     }
 
@@ -200,7 +223,9 @@ public class DebPackageConfig {
     @Accessors(chain = true)
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class DebFileSpec {
+        @NotNull
         List<@Valid TarFileSpec> controlFiles;
+        @NotNull
         List<@Valid TarFileSpec> dataFiles;
     }
 }
