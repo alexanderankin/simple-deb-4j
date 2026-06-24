@@ -58,6 +58,7 @@ class BuildDebTest {
                                 .setMaintainer("test_simpleInstall")
                                 .setDescription("test_simpleInstall"))
                         .setFiles(new DebFileSpec()
+                                .setControlFiles(List.of())
                                 .setDataFiles(List.of(new DebPackageConfig.TarFileSpec.TextTarFileSpec()
                                         .setContent("#!/usr/bin/env bash\necho test_simpleInstall")
                                         .setMode(0x755)
@@ -140,12 +141,12 @@ class BuildDebTest {
         var aConfig = validate(new DebPackageConfig()
                 .setMeta(new PackageMeta().setName("conflicts-a").setVersion("0.0.1").setArch(DebArch.current()))
                 .setControl(new ControlExtras().setMaintainer("maintainer").setDescription("description").setConflicts("conflicts-b"))
-                .setFiles(new DebFileSpec().setDataFiles(List.of(new DebPackageConfig.TarFileSpec.TextTarFileSpec().setContent("a").setPath("/etc/conflicts-pkg"))))
+                .setFiles(new DebFileSpec().setControlFiles(List.of()).setDataFiles(List.of(new DebPackageConfig.TarFileSpec.TextTarFileSpec().setContent("a").setPath("/etc/conflicts-pkg"))))
         );
         var bConfig = validate(new DebPackageConfig()
                 .setMeta(new PackageMeta().setName("conflicts-b").setVersion("0.0.1").setArch(DebArch.current()))
                 .setControl(new ControlExtras().setMaintainer("maintainer").setDescription("description").setConflicts("conflicts-a"))
-                .setFiles(new DebFileSpec().setDataFiles(List.of(new DebPackageConfig.TarFileSpec.TextTarFileSpec().setContent("b").setPath("/etc/conflicts-pkg"))))
+                .setFiles(new DebFileSpec().setControlFiles(List.of()).setDataFiles(List.of(new DebPackageConfig.TarFileSpec.TextTarFileSpec().setContent("b").setPath("/etc/conflicts-pkg"))))
         );
 
         try (FileSystem fileSystem = Jimfs.newFileSystem(Configuration.unix())) {
@@ -180,7 +181,7 @@ class BuildDebTest {
         var config = validate(new DebPackageConfig()
                 .setMeta(new PackageMeta().setName("spec-type-dir").setVersion("0.0.1").setArch(DebArch.current()))
                 .setControl(new ControlExtras().setMaintainer("m").setDescription("d"))
-                .setFiles(new DebFileSpec().setDataFiles(List.of(
+                .setFiles(new DebFileSpec().setControlFiles(List.of()).setDataFiles(List.of(
                         new DebPackageConfig.TarFileSpec.DirTarFileSpec()
                                 .setSourcePath("src/test/resources/deb/simple/build_deb/spec-type-dir")
                                 .setPath("/opt/spec-type-dir")))));
