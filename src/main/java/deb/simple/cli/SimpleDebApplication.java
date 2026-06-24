@@ -10,29 +10,31 @@ import jakarta.validation.Validation;
 import jakarta.validation.ValidatorFactory;
 import lombok.Data;
 import lombok.SneakyThrows;
+import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.pgpainless.key.generation.type.rsa.RsaLength;
+import org.springframework.util.Assert;
 import picocli.AutoComplete;
 import picocli.CommandLine;
 import picocli.CommandLine.ArgGroup;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
+import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3ClientBuilder;
+import software.amazon.awssdk.services.s3.model.CopyObjectRequest;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.ssm.SsmClient;
 import software.amazon.awssdk.services.ssm.SsmClientBuilder;
-import software.amazon.awssdk.services.ssm.model.GetParameterRequest;
 import software.amazon.awssdk.services.ssm.model.GetParametersRequest;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 @Slf4j
 @Command(
@@ -60,10 +62,13 @@ public class SimpleDebApplication {
 
     @Command(name = "build", aliases = {"b"}, description = "build a debian package")
     static class Build implements Runnable {
-        @Option(names = {"-c", "--config"}, description = "configuration file")
+        @Option(names = {"-c", "--config"}, description = "configuration file", required = true)
         Path configFile;
-        @Option(names = {"-o", "--output"}, description = "output directory")
-        Path outDir;
+        @Option(names = {"-p", "--param", "--parameter"},
+                description = "envsubst style key value pairs, e.g. for '-p ARCH=amd64', will substitute all __ARCH__ in config file with text 'amd64'")
+        List<String> parameters;
+        @ArgGroup(multiplicity = "1")
+        BuildOutput buildOutput;
         @Option(names = {"-i", "--index"}, description = "produce index package - suitable for indexing but not installable")
         boolean index = false;
         @Option(names = {"-C"}, description = "change directory before running (defaults to $PWD)")
@@ -74,22 +79,105 @@ public class SimpleDebApplication {
         public void run() {
             var mapper = JsonMapper.builder().findAndAddModules().build();
             var yamlMapper = YAMLMapper.builder().findAndAddModules().build();
+            var configFileContent = Files.readString(configFile);
+            for (var param : Objects.requireNonNullElse(parameters, List.<String>of())) {
+                var split = Arrays.asList(param.split("="));
+                Assert.isTrue(split.size() == 2,
+                        () -> "param should be in format k=v, but was: " + param);
+                Assert.isTrue(split.getFirst().equals(split.getFirst().toUpperCase()),
+                        () -> "param 'key' should be uppercase, but was: " + split.getFirst());
+                configFileContent = configFileContent.replace("__" + split.getFirst() + "__", split.getLast());
+            }
             DebPackageConfig config;
             try {
-                config = mapper.readValue(configFile.toFile(), DebPackageConfig.class);
+                config = mapper.readValue(configFileContent, DebPackageConfig.class);
             } catch (JsonProcessingException jpe) {
-                config = yamlMapper.readValue(configFile.toFile(), DebPackageConfig.class);
+                config = yamlMapper.readValue(configFileContent, DebPackageConfig.class);
             }
             try (ValidatorFactory validatorFactory = Validation.buildDefaultValidatorFactory()) {
                 var errors = validatorFactory.getValidator().validate(config);
                 if (!errors.isEmpty())
                     throw new ConstraintViolationException(errors);
             }
-            var deb = new BuildDeb()
-                    .setCurrent(current)
-                    .buildDeb(config, outDir);
-            if (index)
-                new BuildIndex().buildDebIndex(deb, config, outDir);
+            if (buildOutput.getOutDir() != null) {
+                var outDir = buildOutput.getOutDir();
+                var deb = new BuildDeb()
+                        .setCurrent(current)
+                        .buildDeb(config, outDir);
+                if (index)
+                    new BuildIndex().buildDebIndex(deb, config, outDir);
+            } else if (buildOutput.getS3Output() != null) {
+                var pkgBytes = new BuildDeb().setCurrent(current).buildDebToArchive(config);
+                var indexBytes = new BuildIndex().buildDebIndexToBytes(pkgBytes, config);
+
+                S3ClientBuilder builder = S3Client.builder();
+                Optional.ofNullable(buildOutput.getS3Output().getRegion())
+                        .map(Region::of)
+                        .map(builder::region);
+                try (S3Client s3Client = builder.build()) {
+                    var s3Url = buildOutput.getS3Output().getS3Url();
+
+                    var keyPrefix = StringUtils.strip(s3Url.getPath(), "/");
+                    if (!keyPrefix.endsWith("/pool"))
+                        throw new IllegalStateException("-s3o should upload to /pool");
+
+                    var codenames = new ArrayList<>(new HashSet<>(buildOutput.getS3Output().getCodenames()));
+                    var cn = codenames.getFirst();
+                    s3Client.putObject(
+                            PutObjectRequest.builder()
+                                    .bucket(s3Url.getHost())
+                                    .key(keyPrefix + "/" + cn + "/" + config.getMeta().getDebFilename())
+                                    .build(),
+                            RequestBody.fromBytes(pkgBytes));
+
+                    s3Client.putObject(
+                            PutObjectRequest.builder()
+                                    .bucket(s3Url.getHost())
+                                    .key(keyPrefix + "/" + cn + "/" + config.getMeta().getIndexFilename())
+                                    .build(),
+                            RequestBody.fromBytes(indexBytes));
+
+                    for (var cnFileName : List.of(config.getMeta().getDebFilename(), config.getMeta().getIndexFilename())) {
+                        for (var otherCn : codenames.subList(1, codenames.size())) {
+                            s3Client.copyObject(CopyObjectRequest.builder()
+                                    .sourceBucket(s3Url.getHost())
+                                    .sourceKey(keyPrefix + "/" + cn + "/" + cnFileName)
+                                    .destinationBucket(s3Url.getHost())
+                                    .destinationKey(keyPrefix + "/" + otherCn + "/" + cnFileName)
+                                    .build());
+                        }
+                    }
+                }
+            } else {
+                throw new UnsupportedOperationException("need either one of: -o, -s3o");
+            }
+        }
+
+        @Data
+        @Accessors(chain = true)
+        public static class BuildOutput {
+            @Option(names = {"-o", "--output"}, description = "output directory")
+            Path outDir;
+            @ArgGroup(exclusive = false)
+            BuildS3Output s3Output;
+
+            @Data
+            @Accessors(chain = true)
+            public static class BuildS3Output {
+                @Option(names = {"-s3o", "--s3-output"}, description = "s3 output", required = true)
+                URI s3Url;
+
+                @Option(names = {"--region", "-s3o-region", "--s3-output-region"}, description = "s3 region")
+                String region;
+
+                @Option(names = {"-cn", "--codename"}, description = "codename (subdir of ./pool)", arity = "1..*")
+                List<Codename> codenames;
+
+                public enum Codename {
+                    jammy, noble, resolute,
+                    bullseye, bookworm, trixie,
+                }
+            }
         }
     }
 

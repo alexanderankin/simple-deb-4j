@@ -10,10 +10,17 @@ import org.apache.commons.compress.archivers.ar.ArArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
-import org.apache.commons.compress.archivers.tar.TarConstants;
+import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
+import org.apache.commons.compress.archivers.zip.ZipArchiveInputStream;
 import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.GetBucketLocationRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -21,10 +28,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -145,7 +149,10 @@ public class BuildDeb {
                     case DebPackageConfig.TarFileSpec.FileTarFileSpec fs ->
                             Files.readAllBytes(current.resolve(fs.getSourcePath()));
                     case DebPackageConfig.TarFileSpec.UrlTarFileSpec fs -> downloadUrlTarFile(fs);
-                    default -> throw new IllegalStateException();
+                    case DebPackageConfig.TarFileSpec.S3ZipArchiveTarFileSpec fs -> downloadFileFromZipInS3(fs);
+                    case DebPackageConfig.TarFileSpec.S3ObjectTarFileSpec fs -> downloadS3Object(fs);
+                    // list absent cases explicitly:
+                    case DebPackageConfig.TarFileSpec.DirTarFileSpec ignored -> throw new IllegalStateException();
                 };
                 TarArchiveEntry entry = new TarArchiveEntry(f.getPath());
                 entry.setSize(content.length);
@@ -176,6 +183,45 @@ public class BuildDeb {
                 .body(byte[].class);
         Assert.isTrue(result != null, "have result");
         return result;
+    }
+
+    private byte[] downloadS3Object(DebPackageConfig.TarFileSpec.S3ObjectTarFileSpec s) {
+        var bucket = s.getS3Url().getHost();
+        var key = StringUtils.trimLeadingCharacter(s.getS3Url().getPath(), '/');
+
+        var s3ClientBuilder = S3Client.builder();
+        if (s.getRegion() != null) {
+            s3ClientBuilder.region(Region.of(s.getRegion()));
+        } else {
+            try (var regionClient = S3Client.create()) {
+                s3ClientBuilder.region(Region.of(regionClient.headBucket(
+                        HeadBucketRequest.builder()
+                                .bucket(bucket)
+                                .build()
+                ).bucketRegion()));
+            } catch (Exception e) {
+                log.debug("could not figure out region", e);
+            }
+        }
+        try (var s3Client = s3ClientBuilder.build()) {
+            return s3Client.getObjectAsBytes(GetObjectRequest.builder().bucket(bucket).key(key).build()).asByteArrayUnsafe();
+        }
+    }
+
+    @SneakyThrows
+    private byte[] downloadFileFromZipInS3(DebPackageConfig.TarFileSpec.S3ZipArchiveTarFileSpec s) {
+        var bytes = downloadS3Object(s);
+        try (var zipArchive = new ZipArchiveInputStream(new ByteArrayInputStream(bytes))) {
+            ZipArchiveEntry entry;
+            while ((entry = zipArchive.getNextEntry()) != null && !Objects.equals(s.getZipPath(), entry.getName())) {
+                log.debug("found unrelated entry '{}': {}", entry.getName(), entry);
+            }
+
+            if (entry != null) {
+                return zipArchive.readAllBytes();
+            }
+        }
+        throw new IllegalStateException("archive does not contain requested path: " + s.getZipPath());
     }
 
     /**
