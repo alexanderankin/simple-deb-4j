@@ -24,6 +24,7 @@ import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3ClientBuilder;
+import software.amazon.awssdk.services.s3.model.CopyObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.ssm.SsmClient;
 import software.amazon.awssdk.services.ssm.SsmClientBuilder;
@@ -66,7 +67,7 @@ public class SimpleDebApplication {
         @Option(names = {"-p", "--param", "--parameter"},
                 description = "envsubst style key value pairs, e.g. for '-p ARCH=amd64', will substitute all __ARCH__ in config file with text 'amd64'")
         List<String> parameters;
-        @ArgGroup
+        @ArgGroup(multiplicity = "1")
         BuildOutput buildOutput;
         @Option(names = {"-i", "--index"}, description = "produce index package - suitable for indexing but not installable")
         boolean index = false;
@@ -115,20 +116,37 @@ public class SimpleDebApplication {
                         .map(builder::region);
                 try (S3Client s3Client = builder.build()) {
                     var s3Url = buildOutput.getS3Output().getS3Url();
-                    var cn = buildOutput.getS3Output().getCodename();
+
+                    var keyPrefix = StringUtils.strip(s3Url.getPath(), "/");
+                    if (!keyPrefix.endsWith("/pool"))
+                        throw new IllegalStateException("-s3o should upload to /pool");
+
+                    var codenames = new ArrayList<>(new HashSet<>(buildOutput.getS3Output().getCodenames()));
+                    var cn = codenames.getFirst();
                     s3Client.putObject(
                             PutObjectRequest.builder()
                                     .bucket(s3Url.getHost())
-                                    .key(StringUtils.strip(s3Url.getPath(), "/") + "/" + cn + "/" + config.getMeta().getDebFilename())
+                                    .key(keyPrefix + "/" + cn + "/" + config.getMeta().getDebFilename())
                                     .build(),
                             RequestBody.fromBytes(pkgBytes));
 
                     s3Client.putObject(
                             PutObjectRequest.builder()
                                     .bucket(s3Url.getHost())
-                                    .key(StringUtils.strip(s3Url.getPath(), "/") + "/" + cn + "/" + config.getMeta().getIndexFilename())
+                                    .key(keyPrefix + "/" + cn + "/" + config.getMeta().getIndexFilename())
                                     .build(),
                             RequestBody.fromBytes(indexBytes));
+
+                    for (var cnFileName : List.of(config.getMeta().getDebFilename(), config.getMeta().getIndexFilename())) {
+                        for (var otherCn : codenames.subList(1, codenames.size())) {
+                            s3Client.copyObject(CopyObjectRequest.builder()
+                                    .sourceBucket(s3Url.getHost())
+                                    .sourceKey(keyPrefix + "/" + cn + "/" + cnFileName)
+                                    .destinationBucket(s3Url.getHost())
+                                    .destinationKey(keyPrefix + "/" + otherCn + "/" + cnFileName)
+                                    .build());
+                        }
+                    }
                 }
             } else {
                 throw new UnsupportedOperationException("need either one of: -o, -s3o");
@@ -152,8 +170,8 @@ public class SimpleDebApplication {
                 @Option(names = {"--region", "-s3o-region", "--s3-output-region"}, description = "s3 region")
                 String region;
 
-                @Option(names = {"-cn", "--codename"}, description = "codename (subdir of ./pool)", required = true)
-                Codename codename;
+                @Option(names = {"-cn", "--codename"}, description = "codename (subdir of ./pool)", arity = "1..*")
+                List<Codename> codenames;
 
                 public enum Codename {
                     jammy, noble, resolute,

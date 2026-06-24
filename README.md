@@ -8,6 +8,7 @@ This project provides a library and command line tool for performing the debian 
   * build command can upload to s3
   * build can source things from s3 and s3 zips (unzip and pick file from zip)
   * you can parameterize a config file by writing a yaml value as `__ARCH__` and passing `-p ARCH=amd64` on the cli (must be upper case).
+  * you can now upload to multiple (1+) codenames: `-cn noble -cn resolute`
 
 * version 0.0.11
   * gpg signing works and has test

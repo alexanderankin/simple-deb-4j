@@ -20,6 +20,7 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetBucketLocationRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -193,11 +194,11 @@ public class BuildDeb {
             s3ClientBuilder.region(Region.of(s.getRegion()));
         } else {
             try (var regionClient = S3Client.create()) {
-                s3ClientBuilder.region(Region.of(regionClient.getBucketLocation(
-                        GetBucketLocationRequest.builder()
+                s3ClientBuilder.region(Region.of(regionClient.headBucket(
+                        HeadBucketRequest.builder()
                                 .bucket(bucket)
                                 .build()
-                ).locationConstraint().toString()));
+                ).bucketRegion()));
             } catch (Exception e) {
                 log.debug("could not figure out region", e);
             }
