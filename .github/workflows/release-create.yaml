@@ -27,3 +27,4 @@ jobs:
           ref=${{ github.event.ref }}
           gh release upload ${ref##*/} build/public/*
           gh release upload ${ref##*/} build/deb/*
+      - run: ./gradlew publishToMavenCentral

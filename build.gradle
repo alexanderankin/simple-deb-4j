@@ -1,10 +1,16 @@
+import com.vanniktech.maven.publish.Checksum
+import com.vanniktech.maven.publish.DeploymentValidation
+import com.vanniktech.maven.publish.JavadocJar
+import com.vanniktech.maven.publish.SourcesJar
+
 plugins {
     id 'java'
     id 'application'
     id 'com.google.cloud.tools.jib' version '3.5.2' // https://plugins.gradle.org/plugin/com.google.cloud.tools.jib
     id 'com.gradleup.shadow' version '9.3.1' // https://plugins.gradle.org/plugin/com.gradleup.shadow
     id 'jacoco'
-    // id 'com.vanniktech.maven.publish' version '0.37.0' // https://mvnrepository.com/artifact/com.vanniktech/gradle-maven-publish-plugin
+    // https://mvnrepository.com/artifact/com.vanniktech/gradle-maven-publish-plugin
+    id 'com.vanniktech.maven.publish' version '0.37.0'
 }
 
 repositories {
@@ -14,6 +20,7 @@ repositories {
 application.mainClass.set 'deb.simple.cli.SimpleDebApplication'
 
 version = file('version.txt').text.trim()
+group = 'info.ankin.projects'
 jar.manifest.attributes(['Implementation-Version': version])
 
 sourceSets {
@@ -57,8 +64,11 @@ dependencies {
 
     implementation 'info.picocli:picocli:4.7.6'
     implementation 'org.apache.commons:commons-compress:1.27.1'
+    implementation 'org.apache.httpcomponents.client5:httpclient5'
     implementation 'org.pgpainless:pgpainless-core:2.0.3'
     implementation 'org.pgpainless:pgpainless-sop:2.0.3'
+
+    implementation 'org.slf4j:jcl-over-slf4j'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.boot:spring-boot-testcontainers'
@@ -132,3 +142,87 @@ def buildDeb = tasks.register('buildDeb', JavaExec) {
 
 tasks.build.dependsOn buildDeb
 tasks.assemble.dependsOn buildDeb
+
+// https://gradleup.com/shadow/publishing/
+shadow { addShadowVariantIntoJavaComponent = false }
+
+java {
+    // withJavadocJar()
+    withSourcesJar()
+}
+
+/*
+https://vanniktech.github.io/gradle-maven-publish-plugin/central/#secrets
+
+scp ${somewhere_safe}:~/.ssh/maven-central.* ~/.ssh/
+
+export ORG_GRADLE_PROJECT_mavenCentralUsername=$(cat ~/.ssh/maven-central.token.xml | grep -m1 -oP '(?<=<username>).*?(?=</username>)')
+export ORG_GRADLE_PROJECT_mavenCentralPassword=$(cat ~/.ssh/maven-central.token.xml | grep -m1 -oP '(?<=<password>).*?(?=</password>)')
+export ORG_GRADLE_PROJECT_signingInMemoryKey="$(cat ~/.ssh/maven-central.key.pgp)"
+
+ORG_GRADLE_PROJECT_signingInMemoryKeyId=12345678            # Optional
+ORG_GRADLE_PROJECT_signingInMemoryKeyPassword=some_password # If key was created with a password.
+*/
+if (['mavenCentralUsername', 'mavenCentralPassword', 'signingInMemoryKey'].every {
+    project.providers.gradleProperty(it).isPresent()
+}) {
+    mavenPublishing {
+        publishToMavenCentral(true, DeploymentValidation.VALIDATED)
+        signAllPublications()
+
+        checksums(Checksum.MD5, Checksum.SHA1, Checksum.SHA512) // requirements + good hash
+        excludeSignatureChecksums(false)
+
+        configureBasedOnAppliedPlugins(new JavadocJar.Empty(), new SourcesJar.Sources())
+
+        pom {
+            name = project.name
+            description = project.description ?: project.name
+            url = 'https://github.com/alexanderankin/simple-deb-4j'
+
+            licenses {
+                license {
+                    name = 'The Apache License, Version 2.0'
+                    url = 'https://www.apache.org/licenses/LICENSE-2.0.txt'
+                }
+            }
+
+            developers {
+                developer {
+                    id = 'alexanderankin'
+                    name = 'David Ankin'
+                }
+            }
+
+            scm {
+                url = 'https://github.com/alexanderankin/simple-deb-4j'
+                connection = 'scm:git:https://github.com/alexanderankin/simple-deb-4j.git'
+                developerConnection = 'scm:git:ssh://git@github.com/alexanderankin/simple-deb-4j.git'
+            }
+        }
+    }
+}
+
+/*
+# install pgpainless-cli pre-requisites
+sdk install java 11.0.31-tem # must be installed
+sdk install java 21.0.11-tem # install 21 last, actually use that
+
+# install pgpainless-cli
+export GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+git clone git@github.com:pgpainless/pgpainless.git || git clone https://github.com/pgpainless/pgpainless.git
+cd pgpainless
+./gradlew :pgpainless-cli:installDist
+ln -s $PWD/pgpainless-cli/build/install/pgpainless-cli/bin/pgpainless-cli ~/.local/bin/ # or other location in your PATH
+
+# generate key
+uid="$(git config user.name) <$(git config user.email)>" && [ "${uid}" != " <>" ] && pgpainless-cli generate-key "${uid}" > maven-central.key.pgp
+pgpainless-cli extract-cert < maven-central.key.pgp > maven-central.public.pgp
+
+# backup key
+#scp maven-central.key.pgp  maven-central.public.pgp ${somewhere_safe}
+mv maven-central.key.pgp  maven-central.public.pgp ~/.ssh/
+
+# then upload
+https://keyserver.ubuntu.com/
+*/

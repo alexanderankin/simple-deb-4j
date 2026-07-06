@@ -8,13 +8,14 @@ import tools.jackson.databind.module.SimpleModule;
 
 public class SimpleDeb4JModule extends SimpleModule {
     public SimpleDeb4JModule() {
-        super("my-jackson-module");
-        var hexIntDeser = new HexIntegerDeserializer();
-        addDeserializer(Integer.class, hexIntDeser);
-        addDeserializer(Integer.TYPE, hexIntDeser);
+        super("simple-deb4j-module");
+        addDeserializer(Integer.class, HexIntegerDeserializer.INSTANCE);
+        addDeserializer(Integer.TYPE, HexIntegerDeserializer.INSTANCE);
     }
 
     static class HexIntegerDeserializer extends ValueDeserializer<Integer> {
+        static final HexIntegerDeserializer INSTANCE = new HexIntegerDeserializer();
+
         @Override
         public Integer deserialize(JsonParser p, DeserializationContext ctxt) throws JacksonException {
             String s = p.getValueAsString();
