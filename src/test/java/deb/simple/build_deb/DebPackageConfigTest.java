@@ -1,19 +1,19 @@
 package deb.simple.build_deb;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
 import deb.simple.build_deb.DebPackageConfig.TarFileSpec.BinaryTarFileSpec;
 import deb.simple.build_deb.DebPackageConfig.TarFileSpec.TextTarFileSpec;
 import lombok.SneakyThrows;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.dataformat.yaml.YAMLMapper;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 
 class DebPackageConfigTest {
 
-    ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
-    YAMLMapper yamlMapper = (YAMLMapper) new YAMLMapper().findAndRegisterModules();
+    JsonMapper objectMapper = JsonMapper.builder().findAndAddModules().build();
+    YAMLMapper yamlMapper = YAMLMapper.builder().findAndAddModules().build();
 
     @SneakyThrows
     @Test

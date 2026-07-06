@@ -1,13 +1,13 @@
 package deb.simple.build_deb;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.SneakyThrows;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 
 public class BuildIndex {
-    ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
+    JsonMapper objectMapper = JsonMapper.builder().findAndAddModules().build();
 
     @SuppressWarnings("UnusedReturnValue")
     @SneakyThrows

@@ -1,6 +1,5 @@
 package deb.simple.build_deb;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import deb.simple.build_deb.BuildRepository.Repo;
 import lombok.Data;
 import lombok.NonNull;
@@ -14,6 +13,7 @@ import org.bouncycastle.util.encoders.Hex;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.*;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -39,7 +39,7 @@ public interface BuildRepositoryIO {
     @Accessors(chain = true)
     class FileBrIo implements BuildRepositoryIO {
         @NonNull
-        ObjectMapper objectMapper;
+        JsonMapper objectMapper;
         @NonNull
         Path inDir;
         @NonNull
@@ -87,7 +87,7 @@ public interface BuildRepositoryIO {
         @NonNull
         S3Client s3Client;
         @NonNull
-        ObjectMapper objectMapper;
+        JsonMapper objectMapper;
         @NonNull
         URI inPrefix;
         @NonNull

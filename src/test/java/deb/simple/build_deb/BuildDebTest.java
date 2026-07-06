@@ -1,6 +1,5 @@
 package deb.simple.build_deb;
 
-import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
 import com.google.common.jimfs.Configuration;
 import com.google.common.jimfs.Jimfs;
 import deb.simple.DebArch;
@@ -17,6 +16,7 @@ import org.apache.commons.io.IOUtils;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.images.builder.Transferable;
+import tools.jackson.dataformat.yaml.YAMLMapper;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystem;
@@ -33,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 class BuildDebTest {
 
     BuildDeb buildDeb = new BuildDeb();
-    YAMLMapper yamlMapper = (YAMLMapper) new YAMLMapper().findAndRegisterModules();
+    YAMLMapper yamlMapper = YAMLMapper.builder().findAndAddModules().build();
     ValidatorFactory validatorFactory = Validation.buildDefaultValidatorFactory();
     Validator validator = validatorFactory.getValidator();
 

@@ -1,8 +1,5 @@
 package deb.simple.cli;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.json.JsonMapper;
-import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
 import deb.simple.build_deb.*;
 import deb.simple.gpg.GenerateGpgKey;
 import jakarta.validation.ConstraintViolationException;
@@ -29,6 +26,9 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.ssm.SsmClient;
 import software.amazon.awssdk.services.ssm.SsmClientBuilder;
 import software.amazon.awssdk.services.ssm.model.GetParametersRequest;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.dataformat.yaml.YAMLMapper;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -91,7 +91,7 @@ public class SimpleDebApplication {
             DebPackageConfig config;
             try {
                 config = mapper.readValue(configFileContent, DebPackageConfig.class);
-            } catch (JsonProcessingException jpe) {
+            } catch (JacksonException ignored) {
                 config = yamlMapper.readValue(configFileContent, DebPackageConfig.class);
             }
             try (ValidatorFactory validatorFactory = Validation.buildDefaultValidatorFactory()) {
@@ -130,14 +130,17 @@ public class SimpleDebApplication {
                                     .build(),
                             RequestBody.fromBytes(pkgBytes));
 
-                    s3Client.putObject(
-                            PutObjectRequest.builder()
-                                    .bucket(s3Url.getHost())
-                                    .key(keyPrefix + "/" + cn + "/" + config.getMeta().getIndexFilename())
-                                    .build(),
-                            RequestBody.fromBytes(indexBytes));
+                    if (index)
+                        s3Client.putObject(
+                                PutObjectRequest.builder()
+                                        .bucket(s3Url.getHost())
+                                        .key(keyPrefix + "/" + cn + "/" + config.getMeta().getIndexFilename())
+                                        .build(),
+                                RequestBody.fromBytes(indexBytes));
 
                     for (var cnFileName : List.of(config.getMeta().getDebFilename(), config.getMeta().getIndexFilename())) {
+                        if (!index && cnFileName.equals(config.getMeta().getIndexFilename()))
+                            continue;
                         for (var otherCn : codenames.subList(1, codenames.size())) {
                             s3Client.copyObject(CopyObjectRequest.builder()
                                     .sourceBucket(s3Url.getHost())
