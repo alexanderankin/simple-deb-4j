@@ -4,6 +4,7 @@ plugins {
     id 'com.google.cloud.tools.jib' version '3.5.2' // https://plugins.gradle.org/plugin/com.google.cloud.tools.jib
     id 'com.gradleup.shadow' version '9.3.1' // https://plugins.gradle.org/plugin/com.gradleup.shadow
     id 'jacoco'
+    // id 'com.vanniktech.maven.publish' version '0.37.0' // https://mvnrepository.com/artifact/com.vanniktech/gradle-maven-publish-plugin
 }
 
 repositories {
@@ -36,15 +37,16 @@ configurations {
 }
 
 dependencies {
-    implementation platform('org.springframework.boot:spring-boot-dependencies:3.5.15')
-    annotationProcessor platform('org.springframework.boot:spring-boot-dependencies:3.5.15')
-    implementation platform('org.springframework.cloud:spring-cloud-dependencies:2025.0.3')
-    implementation platform('io.awspring.cloud:spring-cloud-aws-dependencies:3.4.2')
+    implementation platform('org.springframework.boot:spring-boot-dependencies:4.0.7')
+    annotationProcessor platform('org.springframework.boot:spring-boot-dependencies:4.0.7')
+    implementation platform('org.springframework.cloud:spring-cloud-dependencies:2025.1.2')
+    implementation platform('io.awspring.cloud:spring-cloud-aws-dependencies:4.0.2')
 
     annotationProcessor 'org.projectlombok:lombok'
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'info.picocli:picocli-codegen:4.7.6'
 
+    implementation 'org.springframework.boot:spring-boot-starter-restclient'
     implementation 'org.springframework.boot:spring-boot-starter-json'
     implementation 'org.springframework.boot:spring-boot-starter-logging'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
