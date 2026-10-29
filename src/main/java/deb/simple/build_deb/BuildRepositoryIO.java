@@ -105,7 +105,7 @@ public interface BuildRepositoryIO {
 
             addListToResultKeys(filter(response.contents()), resultKeys);
 
-            if (response.isTruncated()) {
+            while (response.isTruncated()) {
                 String token = response.nextContinuationToken();
                 response = s3Client.listObjectsV2(ListObjectsV2Request.builder()
                         .bucket(inPrefix.getHost())
