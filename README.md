@@ -4,6 +4,9 @@ This project provides a library and command line tool for performing the debian 
 
 ## changes
 
+* version 0.0.13
+  * fix: `repo` reading from s3 now follows every page of the listing (previously stopped after 2 pages / 2,000 objects, silently dropping packages from the index)
+
 * version 0.0.12
   * build command can upload to s3
   * build can source things from s3 and s3 zips (unzip and pick file from zip)
