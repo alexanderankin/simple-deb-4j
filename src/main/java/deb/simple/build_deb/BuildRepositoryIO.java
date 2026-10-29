@@ -98,9 +98,15 @@ public interface BuildRepositoryIO {
         public Map<String, List<DebPackageMeta>> readMetas() {
             var resultKeys = new HashMap<String, List<S3Object>>();
 
-            String token = null;
-            ListObjectsV2Response response;
-            do {
+            var response = s3Client.listObjectsV2(ListObjectsV2Request.builder()
+                    .bucket(inPrefix.getHost())
+                    .prefix(StringUtils.stripStart(inPrefix.getPath(), "/"))
+                    .build());
+
+            addListToResultKeys(filter(response.contents()), resultKeys);
+
+            while (response.isTruncated()) {
+                String token = response.nextContinuationToken();
                 response = s3Client.listObjectsV2(ListObjectsV2Request.builder()
                         .bucket(inPrefix.getHost())
                         .prefix(StringUtils.stripStart(inPrefix.getPath(), "/"))
@@ -108,8 +114,7 @@ public interface BuildRepositoryIO {
                         .build());
 
                 addListToResultKeys(filter(response.contents()), resultKeys);
-                token = response.nextContinuationToken();
-            } while (Boolean.TRUE.equals(response.isTruncated()));
+            }
 
             return resultKeys.entrySet().stream()
                     .map(codeNameKeys -> {
